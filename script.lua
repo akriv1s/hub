@@ -1,6 +1,7 @@
 -- =====================================================
 --  Game Script Finder v2.0 | by akriv1s
 --  Поиск игр через Roblox Search API + скрипты из ScriptBlox и RoScripts
+-- v2
 -- =====================================================
 
 local Players      = game:GetService("Players")
