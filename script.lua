@@ -1,109 +1,36 @@
 -- =====================================================
---  AkrivHub | Script Hub
---  by akriv1s
+--  AkrivHub v2.0 | Script Hub with Animation
+--  by akriv1s & Assistant
 -- =====================================================
 
 local Players = game:GetService("Players")
 local UIS     = game:GetService("UserInputService")
-local Http    = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 local LP      = Players.LocalPlayer
 
 -- =====================================================
---  СПИСОК СКРИПТОВ
+--  СПИСОК СКРИПТОВ (ИСТОЧНИКИ)
 --  Формат: { name = "Название", url = "RAW-ссылка", desc = "Описание" }
 -- =====================================================
 
 local SCRIPTS = {
-    -- ==== Универсальные ====
-    Universal = {
-        {
-            name = "Infinite Yield",
-            url  = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source",
-            desc = "Классический админ-скрипт с 200+ командами",
-        },
-        {
-            name = "Dark Dex",
-            url  = "https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/Universal/Dark%20Dex.lua",
-            desc = "Просмотр всего дерева игры (Explorer + Properties)",
-        },
-        {
-            name = "Remote Spy",
-            url  = "https://raw.githubusercontent.com/exxtremestuffs/SimpleSpySource/master/SimpleSpy.lua",
-            desc = "Перехват и вызов RemoteEvent",
-        },
-        {
-            name = "Hydroxide",
-            url  = "https://raw.githubusercontent.com/Upbolt/Hydroxide/master/src/hydroxide.lua",
-            desc = "Продвинутый Remote Spy с красивым UI",
-        },
-        {
-            name = "Owl Hub",
-            url  = "https://raw.githubusercontent.com/OwlHUB/OwlHubScripts/main/OwlHubLoader.lua",
-            desc = "Универсальный хаб с кучей функций",
-        },
+    ["Infinite Yield (Universal)"] = {
+        url = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source",
+        desc = "Классический админ-скрипт с 200+ командами"
     },
-
-    -- ==== Шутеры ====
-    FPS = {
-        {
-            name = "Universal ESP",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/ESP.lua",
-            desc = "Wallhack для большинства шутеров",
-        },
-        {
-            name = "Universal Aimbot",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Aimbot.lua",
-            desc = "Плавный аимбот с FOV и предсказанием",
-        },
-        {
-            name = "Blox Strike Aim",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/BloxStrike.lua",
-            desc = "Aim + ESP специально для Blox Strike",
-        },
-        {
-            name = "Silent Aim",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/SilentAim.lua",
-            desc = "Пули летят в цель без движения камеры",
-        },
+    ["Dark Dex (Universal)"] = {
+        url = "https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/Universal/Dark%20Dex.lua",
+        desc = "Просмотр всего дерева игры (Explorer + Properties)"
     },
-
-    -- ==== Симуляторы / Фарм ====
-    Farm = {
-        {
-            name = "Auto Farm Universal",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/AutoFarm.lua",
-            desc = "Автофарм для популярных симуляторов",
-        },
-        {
-            name = "Pet Simulator X",
-            url  = "https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/PSX.lua",
-            desc = "Автофарм монет и питомцев",
-        },
-        {
-            name = "Case Clicker Auto",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/CaseClicker.lua",
-            desc = "Автооткрытие кейсов и продажа лута",
-        },
+    ["SimpleSpy (Universal)"] = {
+        url = "https://raw.githubusercontent.com/exxtremestuffs/SimpleSpySource/master/SimpleSpy.lua",
+        desc = "Перехват и вызов RemoteEvent"
     },
-
-    -- ==== Визуал ====
-    Visual = {
-        {
-            name = "Fullbright",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Fullbright.lua",
-            desc = "Максимальная яркость карты",
-        },
-        {
-            name = "No Fog",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/NoFog.lua",
-            desc = "Убирает туман",
-        },
-        {
-            name = "FPS Booster",
-            url  = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/FPSBooster.lua",
-            desc = "Скрывает мусорные объекты, поднимает FPS",
-        },
+    ["Hydroxide (Universal)"] = {
+        url = "https://raw.githubusercontent.com/Upbolt/Hydroxide/master/src/hydroxide.lua",
+        desc = "Продвинутый Remote Spy с красивым UI"
     },
+    -- Сюда можно добавлять другие скрипты по аналогии
 }
 
 -- =====================================================
@@ -138,7 +65,7 @@ local function loadScript(url, name)
 end
 
 -- =====================================================
---  GUI
+--  GUI С ПЛАВНОЙ АНИМАЦИЕЙ
 -- =====================================================
 
 local function makeHub()
@@ -149,7 +76,7 @@ local function makeHub()
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = LP:WaitForChild("PlayerGui")
 
-    -- Главное окно
+    -- Главное окно (начинаем с анимации)
     local win = Instance.new("Frame")
     win.Name = "Window"
     win.Size = UDim2.new(0, 560, 0, 400)
@@ -160,7 +87,15 @@ local function makeHub()
     win.Draggable = true
     win.Parent = sg
 
-    -- Заголовок
+    -- Анимация открытия (появление)
+    win.BackgroundTransparency = 1
+    local openTween = TweenService:Create(win, 
+        TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), 
+        { BackgroundTransparency = 0 }
+    )
+    openTween:Play()
+
+    -- Заголовок с названием места
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, 0, 0, 38)
     header.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
@@ -171,24 +106,14 @@ local function makeHub()
     title.Size = UDim2.new(1, -100, 1, 0)
     title.Position = UDim2.new(0, 14, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "AkrivHub"
+    title.Text = "AkrivHub | " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 17
+    title.TextSize = 16
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
 
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(0, 200, 1, 0)
-    subtitle.Position = UDim2.new(0, 90, 0, 0)
-    subtitle.BackgroundTransparency = 1
-    subtitle.Text = "| Script Hub v1.0"
-    subtitle.TextColor3 = Color3.fromRGB(120, 120, 150)
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.TextSize = 11
-    subtitle.TextXAlignment = Enum.TextXAlignment.Left
-    subtitle.Parent = header
-
+    -- Кнопка закрытия с анимацией
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 28, 0, 28)
     closeBtn.Position = UDim2.new(1, -36, 0, 5)
@@ -199,7 +124,17 @@ local function makeHub()
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 18
     closeBtn.Parent = header
-    closeBtn.MouseButton1Click:Connect(function() sg:Destroy() end)
+    closeBtn.MouseButton1Click:Connect(function()
+        -- Анимация закрытия
+        local closeTween = TweenService:Create(win, 
+            TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), 
+            { BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0) }
+        )
+        closeTween:Play()
+        closeTween.Completed:Connect(function()
+            sg:Destroy()
+        end)
+    end)
 
     -- Сайдбар с категориями
     local sidebar = Instance.new("Frame")
@@ -233,60 +168,26 @@ local function makeHub()
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = scroll
 
-    -- Кнопки категорий
-    local categoryButtons = {}
-    local currentCategory = nil
-
-    local function clearContent()
+    -- Функция для обновления списка скриптов
+    local function updateScriptList()
         for _, c in ipairs(scroll:GetChildren()) do
             if c:IsA("TextButton") or c:IsA("Frame") then
                 c:Destroy()
             end
         end
-    end
 
-    local function showCategory(catName)
-        clearContent()
-        currentCategory = catName
-
-        -- Подсветка активной кнопки
-        for name, btn in pairs(categoryButtons) do
-            if name == catName then
-                btn.BackgroundColor3 = Color3.fromRGB(50, 50, 75)
-                btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            else
-                btn.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-                btn.TextColor3 = Color3.fromRGB(160, 160, 180)
-            end
-        end
-
-        local list = SCRIPTS[catName]
-        if not list or #list == 0 then
-            local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, 0, 0, 40)
-            lbl.BackgroundTransparency = 1
-            lbl.Text = "В этой категории пока нет скриптов"
-            lbl.TextColor3 = Color3.fromRGB(140, 140, 160)
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.Parent = scroll
-            return
-        end
-
-        for i, script in ipairs(list) do
-            -- Карточка скрипта
+        for name, script in pairs(SCRIPTS) do
             local card = Instance.new("Frame")
             card.Size = UDim2.new(1, 0, 0, 72)
             card.BackgroundColor3 = Color3.fromRGB(32, 32, 44)
             card.BorderSizePixel = 0
-            card.LayoutOrder = i
             card.Parent = scroll
 
             local nameL = Instance.new("TextLabel")
             nameL.Size = UDim2.new(1, -100, 0, 22)
             nameL.Position = UDim2.new(0, 12, 0, 8)
             nameL.BackgroundTransparency = 1
-            nameL.Text = script.name
+            nameL.Text = name
             nameL.TextColor3 = Color3.fromRGB(255, 255, 255)
             nameL.Font = Enum.Font.GothamBold
             nameL.TextSize = 14
@@ -297,7 +198,7 @@ local function makeHub()
             descL.Size = UDim2.new(1, -20, 0, 16)
             descL.Position = UDim2.new(0, 12, 0, 32)
             descL.BackgroundTransparency = 1
-            descL.Text = script.desc or ""
+            descL.Text = script.desc
             descL.TextColor3 = Color3.fromRGB(150, 150, 175)
             descL.Font = Enum.Font.Gotham
             descL.TextSize = 11
@@ -305,19 +206,6 @@ local function makeHub()
             descL.TextWrapped = true
             descL.Parent = card
 
-            local urlL = Instance.new("TextLabel")
-            urlL.Size = UDim2.new(1, -20, 0, 12)
-            urlL.Position = UDim2.new(0, 12, 0, 50)
-            urlL.BackgroundTransparency = 1
-            urlL.Text = (script.url or ""):sub(1, 80)
-            urlL.TextColor3 = Color3.fromRGB(100, 100, 130)
-            urlL.Font = Enum.Font.Code
-            urlL.TextSize = 9
-            urlL.TextXAlignment = Enum.TextXAlignment.Left
-            urlL.TextTruncate = Enum.TextTruncate.AtEnd
-            urlL.Parent = card
-
-            -- Кнопка "Запустить"
             local runBtn = Instance.new("TextButton")
             runBtn.Size = UDim2.new(0, 84, 0, 30)
             runBtn.Position = UDim2.new(1, -96, 0.5, -15)
@@ -333,7 +221,7 @@ local function makeHub()
                 runBtn.Text = "..."
                 runBtn.BackgroundColor3 = Color3.fromRGB(180, 150, 60)
                 task.spawn(function()
-                    loadScript(script.url, script.name)
+                    loadScript(script.url, name)
                     task.wait(0.3)
                     runBtn.Text = "✓ ОК"
                     runBtn.BackgroundColor3 = Color3.fromRGB(55, 140, 70)
@@ -344,45 +232,58 @@ local function makeHub()
         end
     end
 
-    -- Создаём кнопки категорий
-    local catY = 10
-    for catName, _ in pairs(SCRIPTS) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -16, 0, 32)
-        btn.Position = UDim2.new(0, 8, 0, catY)
-        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-        btn.BorderSizePixel = 0
-        btn.Text = catName
-        btn.TextColor3 = Color3.fromRGB(160, 160, 180)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 13
-        btn.Parent = sidebar
-        categoryButtons[catName] = btn
-        catY = catY + 38
+    -- Выпадающий список для выбора источника скрипта
+    local sourceDropdown = Instance.new("TextButton")
+    sourceDropdown.Size = UDim2.new(1, -16, 0, 30)
+    sourceDropdown.Position = UDim2.new(0, 8, 0, 8)
+    sourceDropdown.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+    sourceDropdown.BorderSizePixel = 0
+    sourceDropdown.Text = "Выберите источник скрипта..."
+    sourceDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+    sourceDropdown.Font = Enum.Font.Gotham
+    sourceDropdown.TextSize = 12
+    sourceDropdown.Parent = sidebar
 
+    -- Создаём список источников (все ключи из SCRIPTS)
+    local sourceList = Instance.new("ScrollingFrame")
+    sourceList.Size = UDim2.new(1, -16, 0, 200)
+    sourceList.Position = UDim2.new(0, 8, 0, 46)
+    sourceList.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+    sourceList.BorderSizePixel = 0
+    sourceList.Visible = false
+    sourceList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    sourceList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    sourceList.ScrollBarThickness = 4
+    sourceList.Parent = sidebar
+
+    local sourceLayout = Instance.new("UIListLayout")
+    sourceLayout.Padding = UDim.new(0, 2)
+    sourceLayout.Parent = sourceList
+
+    for name, _ in pairs(SCRIPTS) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 26)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 54)
+        btn.BorderSizePixel = 0
+        btn.Text = name
+        btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 11
+        btn.Parent = sourceList
         btn.MouseButton1Click:Connect(function()
-            showCategory(catName)
+            loadScript(SCRIPTS[name].url, name)
+            sourceDropdown.Text = "Загружено: " .. name
+            sourceList.Visible = false
         end)
     end
 
-    -- Показываем первую категорию
-    local firstCat = nil
-    for name, _ in pairs(SCRIPTS) do
-        firstCat = name
-        break
-    end
-    if firstCat then showCategory(firstCat) end
+    -- Открытие/закрытие списка источников
+    sourceDropdown.MouseButton1Click:Connect(function()
+        sourceList.Visible = not sourceList.Visible
+    end)
 
-    -- Футер с версией
-    local footer = Instance.new("TextLabel")
-    footer.Size = UDim2.new(0, 140, 0, 20)
-    footer.Position = UDim2.new(0, 0, 1, -22)
-    footer.BackgroundTransparency = 1
-    footer.Text = "by akriv1s"
-    footer.TextColor3 = Color3.fromRGB(90, 90, 120)
-    footer.Font = Enum.Font.Gotham
-    footer.TextSize = 10
-    footer.Parent = sidebar
+    -- Изначально показываем все скрипты в основном списке
+    updateScriptList()
 
     return sg
 end
@@ -395,8 +296,16 @@ local hubGui = nil
 
 local function toggleHub()
     if hubGui and hubGui.Parent then
-        hubGui:Destroy()
-        hubGui = nil
+        -- Анимация закрытия
+        local closeTween = TweenService:Create(hubGui.Window, 
+            TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), 
+            { BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0) }
+        )
+        closeTween:Play()
+        closeTween.Completed:Connect(function()
+            hubGui:Destroy()
+            hubGui = nil
+        end)
     else
         hubGui = makeHub()
     end
