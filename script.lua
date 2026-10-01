@@ -1,21 +1,19 @@
 -- =====================================================
---  Game Script Finder | by akriv1s
---  Ищет скрипты под любую игру через ScriptBlox API
+--  Game Script Finder v2.0 | by akriv1s
+--  Поиск игр через Roblox Search API + скрипты из ScriptBlox и RoScripts
 -- =====================================================
 
-local Players           = game:GetService("Players")
-local UIS               = game:GetService("UserInputService")
-local HttpService       = game:GetService("HttpService")
-local TweenService      = game:GetService("TweenService")
-local LP                = Players.LocalPlayer
+local Players      = game:GetService("Players")
+local UIS          = game:GetService("UserInputService")
+local HttpService  = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local LP           = Players.LocalPlayer
 
 -- ==================== СОСТОЯНИЕ ====================
 local state = {
     isCollapsed = false,
     mainGui     = nil,
     loadingGui  = nil,
-    currentPlaceId = nil,
-    currentGameName = nil,
 }
 
 -- ==================== УТИЛИТЫ ====================
@@ -39,57 +37,175 @@ local function jsonDecode(str)
     return res
 end
 
--- ==================== ПОИСК PLACEID ====================
-local function searchPlaceId(gameName)
-    local encoded = gameName:gsub(" ", "%%20")
-    local url = "https://games.roblox.com/v1/games/list?model.keyword=" .. encoded .. "&model.maxRows=10"
-    local res, err = httpGet(url)
-    if not res then return nil, err end
+-- ==================== ПОИСК ИГРЫ (НОВЫЙ API) ====================
+local function searchGameByName(gameName)
+    -- URL-энкодинг названия
+    local encoded = gameName:gsub(" ", "%%20"):gsub("[^%w%%]", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end)
 
-    local data, jerr = jsonDecode(res)
-    if not data then return nil, jerr end
+    -- Пробуем несколько эндпоинтов по очереди
+    local endpoints = {
+        "https://apis.roblox.com/search-api/omni-search?searchQuery=" .. encoded .. "&sessionId=0&pageType=all",
+        "https://games.roblox.com/v1/games/list?model.keyword=" .. encoded .. "&model.maxRows=10",
+    }
 
-    if data.games and #data.games > 0 then
-        local first = data.games[1]
-        return first.id, first.name
+    for _, url in ipairs(endpoints) do
+        local res, err = httpGet(url)
+        if res and #res > 10 then
+            local data, jerr = jsonDecode(res)
+            if data then
+                -- Формат omni-search
+                if data.searchResults and data.searchResults[1] and data.searchResults[1].contents then
+                    for _, item in ipairs(data.searchResults[1].contents) do
+                        if item.name and item.placeId then
+                            return item.placeId, item.name
+                        end
+                    end
+                end
+                -- Старый формат games/list
+                if data.games and data.games[1] then
+                    return data.games[1].id, data.games[1].name
+                end
+            end
+        end
     end
     return nil, "Игра не найдена"
 end
 
--- ==================== ПОИСК СКРИПТОВ ====================
-local function fetchScripts(placeId)
-    local url = "https://scriptblox.com/api/script/fetch?placeId=" .. placeId .. "&max=20"
-    local res, err = httpGet(url)
-    if not res then return nil, err end
+-- ==================== ПОИСК СКРИПТОВ (2 ИСТОЧНИКА) ====================
+local function searchScriptBlox(gameName, placeId)
+    local results = {}
+    local encoded = gameName:gsub(" ", "%%20")
 
-    local data, jerr = jsonDecode(res)
-    if not data then return nil, jerr end
-
-    if data.result and data.result.scripts then
-        return data.result.scripts
+    -- 1. Поиск по названию игры
+    local url1 = "https://scriptblox.com/api/script/search?q=" .. encoded .. "&max=15"
+    local res1, err1 = httpGet(url1)
+    if res1 then
+        local data1 = jsonDecode(res1)
+        if data1 and data1.result and data1.result.scripts then
+            for _, s in ipairs(data1.result.scripts) do
+                table.insert(results, {
+                    title = s.title,
+                    game = s.game and s.game.name or gameName,
+                    views = s.views or 0,
+                    verified = s.verified or false,
+                    script = s.script,
+                    source = "ScriptBlox"
+                })
+            end
+        end
     end
-    return {}
+
+    -- 2. Дополнительный поиск по placeId, если есть
+    if placeId then
+        local url2 = "https://scriptblox.com/api/script/search?placeId=" .. tostring(placeId) .. "&max=15"
+        local res2 = httpGet(url2)
+        if res2 then
+            local data2 = jsonDecode(res2)
+            if data2 and data2.result and data2.result.scripts then
+                for _, s in ipairs(data2.result.scripts) do
+                    -- Проверяем, нет ли дубликата
+                    local exists = false
+                    for _, existing in ipairs(results) do
+                        if existing.title == s.title then exists = true break end
+                    end
+                    if not exists then
+                        table.insert(results, {
+                            title = s.title,
+                            game = s.game and s.game.name or gameName,
+                            views = s.views or 0,
+                            verified = s.verified or false,
+                            script = s.script,
+                            source = "ScriptBlox (placeId)"
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    return results
 end
 
--- ==================== ЗАГРУЗКА СКРИПТА ====================
-local function runScript(code, name)
-    if not code or code == "" then
-        warn("[Finder] Пустой код скрипта: " .. tostring(name))
+local function searchRoScripts(gameName)
+    local results = {}
+    local encoded = gameName:gsub(" ", "%%20")
+    local url = "https://api.roscripts.io/v1/scripts/search?q=" .. encoded .. "&max=15"
+    local res = httpGet(url)
+    if not res then return results end
+
+    local data = jsonDecode(res)
+    if data and data.result and data.result.scripts then
+        for _, s in ipairs(data.result.scripts) do
+            table.insert(results, {
+                title = s.title,
+                game = s.game and s.game.name or gameName,
+                views = s.views or 0,
+                verified = s.verified or false,
+                script = s.loadstring, -- RoScripts отдаёт готовую loadstring-ссылку
+                source = "RoScripts",
+                isLoadstring = true -- флаг: не код, а ссылка
+            })
+        end
+    end
+    return results
+end
+
+-- ==================== ОБЪЕДИНЕНИЕ РЕЗУЛЬТАТОВ ====================
+local function findScripts(gameName)
+    -- Сначала ищем игру, чтобы получить placeId
+    local placeId, foundName = searchGameByName(gameName)
+    if not placeId then
+        return nil, "Игра не найдена. Проверь название."
+    end
+
+    -- Собираем скрипты из обоих источников
+    local allScripts = {}
+
+    local sbScripts = searchScriptBlox(gameName, placeId)
+    for _, s in ipairs(sbScripts) do table.insert(allScripts, s) end
+
+    local rsScripts = searchRoScripts(gameName)
+    for _, s in ipairs(rsScripts) do table.insert(allScripts, s) end
+
+    -- Сортировка: сначала верифицированные, потом по просмотрам
+    table.sort(allScripts, function(a, b)
+        if a.verified and not b.verified then return true end
+        if not a.verified and b.verified then return false end
+        return (a.views or 0) > (b.views or 0)
+    end)
+
+    return allScripts, foundName or gameName
+end
+
+-- ==================== ЗАПУСК СКРИПТА ====================
+local function runScript(scriptData, name)
+    if not scriptData or scriptData == "" then
+        warn("[Finder] Пустой скрипт: " .. tostring(name))
         return false
     end
 
     print("[Finder] Запускаю: " .. tostring(name))
 
     local ok, err = pcall(function()
-        local chunk = loadstring(code)
-        if not chunk then
-            error("loadstring вернул nil")
+        local code
+        if type(scriptData) == "table" and scriptData.isLoadstring then
+            -- RoScripts: scriptData — это уже готовая loadstring-ссылка
+            code = scriptData.script
+            if not code then error("Нет loadstring-ссылки") end
+            loadstring(game:HttpGet(code))()
+        else
+            -- ScriptBlox: scriptData — это исходный код
+            code = scriptData
+            local chunk = loadstring(code)
+            if not chunk then error("loadstring вернул nil") end
+            chunk()
         end
-        chunk()
     end)
 
     if not ok then
-        warn("[Finder] Ошибка запуска «" .. tostring(name) .. "»: " .. tostring(err))
+        warn("[Finder] Ошибка «" .. tostring(name) .. "»: " .. tostring(err))
         return false
     end
     return true
@@ -98,16 +214,13 @@ end
 -- ==================== ПАРТИКЛЫ ЗАГРУЗКИ ====================
 local function createLoadingParticles(parent)
     local container = Instance.new("Frame")
-    container.Name = "Particles"
     container.Size = UDim2.new(1, 0, 1, 0)
     container.BackgroundTransparency = 1
     container.ZIndex = 2
     container.Parent = parent
 
-    local particles = {}
     for i = 1, 40 do
         local p = Instance.new("ImageLabel")
-        p.Name = "P" .. i
         p.Size = UDim2.new(0, math.random(4, 12), 0, math.random(4, 12))
         p.Position = UDim2.new(math.random(), 0, math.random(), 0)
         p.BackgroundTransparency = 1
@@ -116,11 +229,10 @@ local function createLoadingParticles(parent)
         p.ImageTransparency = math.random(30, 80) / 100
         p.ZIndex = 2
         p.Parent = container
-        table.insert(particles, p)
 
         task.spawn(function()
             while p.Parent do
-                local tw = TweenService:Create(p, TweenInfo.new(
+                TweenService:Create(p, TweenInfo.new(
                     math.random(15, 35) / 10,
                     Enum.EasingStyle.Sine,
                     Enum.EasingDirection.InOut
@@ -128,13 +240,11 @@ local function createLoadingParticles(parent)
                     Position = UDim2.new(math.random(), 0, math.random(), 0),
                     ImageTransparency = math.random(40, 90) / 100,
                     Rotation = math.random(-180, 180)
-                })
-                tw:Play()
-                tw.Completed:Wait()
+                }):Play()
+                task.wait(math.random(15, 35) / 10)
             end
         end)
     end
-    return container
 end
 
 -- ==================== ЭКРАН ЗАГРУЗКИ ====================
@@ -145,22 +255,13 @@ local function showLoading()
     sg.IgnoreGuiInset = true
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = LP:WaitForChild("PlayerGui")
+    state.loadingGui = sg
 
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
     bg.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-    bg.BackgroundTransparency = 0
     bg.BorderSizePixel = 0
-    bg.ZIndex = 1
     bg.Parent = sg
-
-    local grad = Instance.new("UIGradient")
-    grad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 25)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 45))
-    }
-    grad.Rotation = 45
-    grad.Parent = bg
 
     local container = Instance.new("Frame")
     container.Size = UDim2.new(0, 400, 0, 200)
@@ -184,7 +285,7 @@ local function showLoading()
     sub.Size = UDim2.new(1, 0, 0, 24)
     sub.Position = UDim2.new(0, 0, 0, 78)
     sub.BackgroundTransparency = 1
-    sub.Text = "by akriv1s"
+    sub.Text = "v2.0 by akriv1s"
     sub.TextColor3 = Color3.fromRGB(120, 120, 160)
     sub.Font = Enum.Font.Gotham
     sub.TextSize = 14
@@ -215,27 +316,21 @@ local function showLoading()
 
     createLoadingParticles(sg)
 
-    task.spawn(function()
-        TweenService:Create(bar, TweenInfo.new(2.5, Enum.EasingStyle.Quart), {
-            Size = UDim2.new(1, 0, 1, 0)
-        }):Play()
-    end)
+    TweenService:Create(bar, TweenInfo.new(2.5, Enum.EasingStyle.Quart), {
+        Size = UDim2.new(1, 0, 1, 0)
+    }):Play()
 
     task.delay(3, function()
         if sg and sg.Parent then
-            local fadeOut = TweenService:Create(bg, TweenInfo.new(0.5), {
-                BackgroundTransparency = 1
-            })
+            local fadeOut = TweenService:Create(bg, TweenInfo.new(0.5), { BackgroundTransparency = 1 })
             fadeOut:Play()
             fadeOut.Completed:Connect(function()
                 sg:Destroy()
                 state.loadingGui = nil
-                showMainGui()
+                if showMainGui then showMainGui() end
             end)
         end
     end)
-
-    state.loadingGui = sg
 end
 
 -- ==================== ГЛАВНЫЙ GUI ====================
@@ -248,8 +343,8 @@ function showMainGui()
     sg.Parent = LP:WaitForChild("PlayerGui")
     state.mainGui = sg
 
+    -- Главное окно
     local win = Instance.new("Frame")
-    win.Name = "Window"
     win.Size = UDim2.new(0, 620, 0, 480)
     win.Position = UDim2.new(0.5, -310, 0.5, -240)
     win.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
@@ -270,11 +365,10 @@ function showMainGui()
     -- Анимация появления
     win.Size = UDim2.new(0, 0, 0, 0)
     win.Position = UDim2.new(0.5, 0, 0.5, 0)
-    local openTween = TweenService:Create(win, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    TweenService:Create(win, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, 620, 0, 480),
         Position = UDim2.new(0.5, -310, 0.5, -240)
-    })
-    openTween:Play()
+    }):Play()
 
     -- ===== ЗАГОЛОВОК =====
     local header = Instance.new("Frame")
@@ -302,7 +396,7 @@ function showMainGui()
     subtitle.Size = UDim2.new(0, 200, 1, 0)
     subtitle.Position = UDim2.new(0, 170, 0, 0)
     subtitle.BackgroundTransparency = 1
-    subtitle.Text = "| Script Search"
+    subtitle.Text = "| Search & Run"
     subtitle.TextColor3 = Color3.fromRGB(100, 100, 140)
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 11
@@ -382,7 +476,7 @@ function showMainGui()
     searchBtn.Position = UDim2.new(1, -120, 0.5, -16)
     searchBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 90)
     searchBtn.BorderSizePixel = 0
-    searchBtn.Text = "🔍 Найти скрипты"
+    searchBtn.Text = "🔍 Найти"
     searchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     searchBtn.Font = Enum.Font.GothamBold
     searchBtn.TextSize = 11
@@ -397,7 +491,7 @@ function showMainGui()
     statusLabel.Size = UDim2.new(1, -30, 0, 20)
     statusLabel.Position = UDim2.new(0, 15, 0, 106)
     statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "Введи название игры и нажми «Найти скрипты»"
+    statusLabel.Text = "Введи название игры и нажми «Найти»"
     statusLabel.TextColor3 = Color3.fromRGB(140, 140, 170)
     statusLabel.Font = Enum.Font.Gotham
     statusLabel.TextSize = 11
@@ -436,21 +530,21 @@ function showMainGui()
     footer.TextSize = 10
     footer.Parent = win
 
-    -- ===== ЛОГИКА ПОИСКА =====
+    -- ===== ЛОГИКА =====
     local function clearList()
         for _, c in ipairs(scroll:GetChildren()) do
             if c:IsA("Frame") then c:Destroy() end
         end
     end
 
-    local function showScripts(scripts, gameName)
+    local function showScripts(scripts, foundGameName)
         clearList()
 
-        if #scripts == 0 then
+        if not scripts or #scripts == 0 then
             local empty = Instance.new("TextLabel")
             empty.Size = UDim2.new(1, 0, 0, 60)
             empty.BackgroundTransparency = 1
-            empty.Text = "Скрипты для этой игры не найдены.\nПопробуй другое название или universal-скрипты."
+            empty.Text = "Скрипты не найдены.\nПопробуй другое название или universal-скрипты."
             empty.TextColor3 = Color3.fromRGB(160, 160, 190)
             empty.Font = Enum.Font.Gotham
             empty.TextSize = 12
@@ -461,7 +555,7 @@ function showMainGui()
 
         for i, script in ipairs(scripts) do
             local card = Instance.new("Frame")
-            card.Size = UDim2.new(1, 0, 0, 68)
+            card.Size = UDim2.new(1, 0, 0, 72)
             card.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
             card.BorderSizePixel = 0
             card.LayoutOrder = i
@@ -487,7 +581,7 @@ function showMainGui()
             info.Size = UDim2.new(1, -110, 0, 14)
             info.Position = UDim2.new(0, 14, 0, 30)
             info.BackgroundTransparency = 1
-            info.Text = (script.game and script.game.name or "—") .. "  •  👁 " .. tostring(script.views or 0) .. "  •  " .. (script.verified and "✅ Verified" or "❌ Not verified")
+            info.Text = (script.source or "?") .. "  •  👁 " .. tostring(script.views or 0) .. "  •  " .. (script.verified and "✅" or "❌")
             info.TextColor3 = Color3.fromRGB(130, 130, 160)
             info.Font = Enum.Font.Gotham
             info.TextSize = 10
@@ -514,7 +608,7 @@ function showMainGui()
                 runBtn.Text = "..."
                 runBtn.BackgroundColor3 = Color3.fromRGB(180, 150, 60)
                 task.spawn(function()
-                    local ok = runScript(script.script, script.title)
+                    local ok = runScript(script, script.title)
                     task.wait(0.3)
                     if ok then
                         runBtn.Text = "✓ ОК"
@@ -546,36 +640,20 @@ function showMainGui()
         clearList()
 
         task.spawn(function()
-            local placeId, gameName = searchPlaceId(query)
-            if not placeId then
-                statusLabel.Text = "❌ Игра не найдена: " .. (gameName or "неизвестно")
-                statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                searchBtn.Text = "🔍 Найти скрипты"
-                searchBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 90)
-                return
-            end
-
-            state.currentPlaceId = placeId
-            state.currentGameName = gameName
-
-            statusLabel.Text = "🎮 Найдено: " .. gameName .. " (ID: " .. placeId .. "). Загружаю скрипты..."
-            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 160)
-
-            local scripts, err = fetchScripts(placeId)
+            local scripts, foundName = findScripts(query)
             if not scripts then
-                statusLabel.Text = "❌ Ошибка загрузки скриптов: " .. tostring(err)
+                statusLabel.Text = "❌ " .. tostring(foundName)
                 statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                searchBtn.Text = "🔍 Найти скрипты"
+                searchBtn.Text = "🔍 Найти"
                 searchBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 90)
                 return
             end
 
-            statusLabel.Text = "✅ Найдено " .. #scripts .. " скриптов для «" .. gameName .. "»"
+            statusLabel.Text = "✅ Найдено " .. #scripts .. " скриптов для «" .. foundName .. "»"
             statusLabel.TextColor3 = Color3.fromRGB(100, 255, 160)
+            showScripts(scripts, foundName)
 
-            showScripts(scripts, gameName)
-
-            searchBtn.Text = "🔍 Найти скрипты"
+            searchBtn.Text = "🔍 Найти"
             searchBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 90)
         end)
     end)
@@ -588,31 +666,27 @@ function showMainGui()
     local function setCollapsed(collapsed)
         isCollapsed = collapsed
         if collapsed then
-            -- Сжимаем в маленькую иконку
-            local tw = TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                 Size = UDim2.new(0, 180, 0, 50),
                 Position = UDim2.new(0, 20, 0, 20)
-            })
-            tw:Play()
+            }):Play()
             collapseBtn.Text = "+"
-            -- Скрываем всё кроме заголовка
             searchFrame.Visible = false
             statusLabel.Visible = false
             scroll.Visible = false
             footer.Visible = false
             subtitle.Text = "• свёрнуто"
         else
-            local tw = TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                 Size = fullSize,
                 Position = fullPos
-            })
-            tw:Play()
+            }):Play()
             collapseBtn.Text = "−"
             searchFrame.Visible = true
             statusLabel.Visible = true
             scroll.Visible = true
             footer.Visible = true
-            subtitle.Text = "| Script Search"
+            subtitle.Text = "| Search & Run"
         end
     end
 
@@ -620,7 +694,6 @@ function showMainGui()
         setCollapsed(not isCollapsed)
     end)
 
-    -- Хоткей Right Shift
     UIS.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
@@ -633,4 +706,4 @@ end
 task.wait(0.5)
 showLoading()
 
-print("[Game Script Finder] Загружен. Введи название игры и жми «Найти скрипты».")
+print("[Game Script Finder v2.0] Загружен. Ищи игры через поле ввода.")
