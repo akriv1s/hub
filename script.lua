@@ -1,6 +1,7 @@
 -- =====================================================
 --  Game Script Finder v2.1 | by akriv1s
 --  Поиск игр через roproxy + скрипты из ScriptBlox и RoScripts
+--  ааа
 -- =====================================================
 
 local Players      = game:GetService("Players")
