@@ -1,206 +1,152 @@
 -- =====================================================
---  AkrivHub v5.3 | Kill Switch Edition
+--  AkrivHub v1.0 Beta | Rounded UI & Popular Scripts
 --  by akriv1s
 -- =====================================================
 
 local Players      = game:GetService("Players")
 local UIS          = game:GetService("UserInputService")
-local VIM          = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
 local LP           = Players.LocalPlayer
 
-local SCRIPTS_URL = "https://raw.githubusercontent.com/akriv1s/scripts/refs/heads/main/scripts.txt"
-
-local scripts = {}
-local isLoaded = false
+-- =====================================================
+--  СПИСОК СКРИПТОВ (20+ популярных игр)
+-- =====================================================
+local SCRIPTS = {
+    -- Популярные игры
+    {
+        name = "Drive a Kukirin | Noxious Hub",
+        game = "Drive a Kukirin",
+        url = "https://raw.githubusercontent.com/NoxiousHub/Drive-A-kukurin-script/refs/heads/main/DriveAKukurin",
+        desc = "Anchor + Anti-AFK"
+    },
+    {
+        name = "Drive a Kukirin | SIFER HUB",
+        game = "Drive a Kukirin",
+        url = "https://rscripts.net/raw/sifer-hub-drive-a-kukirin_1743514612_r51z9nZBcN.txt",
+        desc = "Full Money Farm, Auto Quest, Full Progresses"
+    },
+    {
+        name = "+1 Mog Evolution | Ouroboros Hub",
+        game = "+1 Mog Evolution",
+        url = "https://raw.githubusercontent.com/joustingmatch/Ouroboros/main/loader.lua",
+        desc = "Auto Mog, Auto Win, Auto Rebirth"
+    },
+    {
+        name = "+1 Mog Evolution | Auto Ascend",
+        game = "+1 Mog Evolution",
+        url = "https://pastefy.app/j1ucezZ9/raw",
+        desc = "Auto Wins, Auto Click, Auto Ascend"
+    },
+    {
+        name = "A Desert | Keyless Menu",
+        game = "A desrt",
+        url = "https://robloxdatabase.com/scripts/a-desrt/", -- Страница со скриптом
+        desc = "Keyless menu for A desrt"
+    },
+    {
+        name = "Blox Fruits | Gravity Hub",
+        game = "Blox Fruits",
+        url = "https://raw.githubusercontent.com/Dev-NightMystic/Bloxfruits/refs/heads/main/Script.lua",
+        desc = "Auto Farm Magnet, Fishing"
+    },
+    {
+        name = "Blox Fruits | REDz Hub",
+        game = "Blox Fruits",
+        url = "https://raw.githubusercontent.com/REDzHUB/BloxFruits/main/redz9999.lua",
+        desc = "Auto Farm, Configurable Settings"
+    },
+    {
+        name = "Pet Simulator 99 | Auto Farm",
+        game = "Pet Simulator 99",
+        url = "https://raw.githubusercontent.com/REDzHUB/PetSimulator99/main/redz9999.lua",
+        desc = "Auto Farm, Auto Hatch"
+    },
+    {
+        name = "Grow a Garden | Auto Farm",
+        game = "Grow a Garden",
+        url = "https://raw.githubusercontent.com/epicisgood/Grow-a-Garden-Macro/main/script.lua",
+        desc = "Auto Plant, Auto Sell"
+    },
+    {
+        name = "Blade Ball | SP HUB",
+        game = "Blade Ball",
+        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/BladeBall.lua",
+        desc = "Auto Parry, ESP"
+    },
+    {
+        name = "Blade Ball | Auto Parry",
+        game = "Blade Ball",
+        url = "https://pastebin.com/raw/2frh8A2j",
+        desc = "Auto Parry script"
+    },
+    {
+        name = "Murder Mystery 2 | Forge Hub",
+        game = "Murder Mystery 2",
+        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/MM2.lua",
+        desc = "Kill All, ESP, Auto Farm"
+    },
+    {
+        name = "Murder Mystery 2 | Yarhm Hub",
+        game = "Murder Mystery 2",
+        url = "https://pastebin.com/raw/bS93UtUs",
+        desc = "Auto Farm, FPS Booster"
+    },
+    {
+        name = "Adopt Me | Auto Farm",
+        game = "Adopt Me",
+        url = "https://raw.githubusercontent.com/Ultra-Scripts/AdoptmeScript/main/AdoptmeScript/JI5PMVG-adopt-me.lua",
+        desc = "Auto Farm & Auto Neon"
+    },
+    {
+        name = "Brookhaven | LOLA HUB",
+        game = "Brookhaven",
+        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Brookhaven.lua",
+        desc = "Troll, ESP, Kill, Teleport"
+    },
+    {
+        name = "Jailbreak | Spark Hub",
+        game = "Jailbreak",
+        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Jailbreak.lua",
+        desc = "Silent Aim, Auto Arrest"
+    },
+    {
+        name = "Universal | DUMI HUB",
+        game = "Universal",
+        url = "https://xenoscripts.com/script/universal-script-dumi-hub-aimbot-esp-etc",
+        desc = "Aimbot FOV, Aim Target Lock"
+    },
+    -- Другие популярные игры
+    {
+        name = "Arsenal | Aimbot + ESP",
+        game = "Arsenal",
+        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Arsenal.lua",
+        desc = "Aimbot, ESP, No Recoil"
+    },
+    {
+        name = "Doors | Entity ESP",
+        game = "Doors",
+        url = "https://pastebin.com/raw/2frh8A2j",
+        desc = "Entity ESP, Auto Skip"
+    },
+    {
+        name = "Prison Life | Reaper Aim",
+        game = "Prison Life",
+        url = "https://raw.githubusercontent.com/morenoffproScriptsRoblox/ReaperAim/refs/heads/main/README.md",
+        desc = "Aimbot, ESP, Kill All"
+    },
+}
 
 -- =====================================================
---  ANTI-AFK
+--  ЛОГИКА ЗАГРУЗКИ
 -- =====================================================
-local ANTI_AFK_ENABLED = true
-local ANTI_AFK_INTERVAL = 30
-
-local function startAntiAFK()
-    task.spawn(function()
-        while true do
-            task.wait(ANTI_AFK_INTERVAL)
-            if ANTI_AFK_ENABLED then
-                pcall(function()
-                    VIM:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                    task.wait(0.05)
-                    VIM:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-                    local vu = game:GetService("VirtualUser")
-                    vu:CaptureController()
-                    vu:ClickButton2(Vector2.new())
-                end)
-            end
-        end
-    end)
-end
-
--- =====================================================
---  KILL ALL SCRIPTS — ядерная кнопка
--- =====================================================
-local function killAllScripts()
-    print("[AkrivHub] ⚠ KILL SWITCH: остановка всех скриптов...")
-
-    -- 1. Уничтожаем ВСЕ ScreenGui в PlayerGui
-    local pg = LP:FindFirstChild("PlayerGui")
-    if pg then
-        for _, obj in ipairs(pg:GetChildren()) do
-            if obj:IsA("ScreenGui") then
-                pcall(function() obj:Destroy() end)
-            end
-        end
-    end
-
-    -- 2. Уничтожаем CoreGui (там часто прячутся читы)
-    local cg = game:GetService("CoreGui")
-    for _, obj in ipairs(cg:GetChildren()) do
-        if obj:IsA("ScreenGui") and obj.Name ~= "RobloxGui" then
-            pcall(function() obj:Destroy() end)
-        end
-    end
-
-    -- 3. Отключаем все Connections (если исполнитель поддерживает)
-    if getconnections then
-        local connections = getconnections(game:GetService("RunService").Heartbeat)
-        for _, conn in ipairs(connections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        connections = getconnections(game:GetService("RunService").RenderStepped)
-        for _, conn in ipairs(connections) do
-            pcall(function() conn:Disconnect() end)
-        end
-    end
-
-    -- 4. Останавливаем все Loop-потоки Lua (мягко)
-    pcall(function()
-        for _, thread in ipairs(debug and debug.getthreads and debug.getthreads() or {}) do
-            if coroutine.status(thread) == "suspended" or coroutine.status(thread) == "running" then
-                pcall(function() task.cancel(thread) end)
-            end
-        end
-    end)
-
-    -- 5. Возвращаем скорость игрока к норме
-    pcall(function()
-        local char = LP.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16
-            hum.JumpPower = 50
-        end
-    end)
-
-    -- 6. Возвращаем Lighting к дефолту
-    pcall(function()
-        local Light = game:GetService("Lighting")
-        Light.Ambient = Color3.fromRGB(70, 70, 70)
-        Light.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-        Light.Brightness = 2
-        Light.FogEnd = 100000
-        Light.GlobalShadows = true
-    end)
-
-    -- 7. Убираем тело полёта, если есть
-    pcall(function()
-        local char = LP.Character
-        if char then
-            for _, obj in ipairs(char:GetDescendants()) do
-                if obj:IsA("BodyVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyGyro") then
-                    obj:Destroy()
-                end
-            end
-        end
-    end)
-
-    -- 8. Убираем оставшиеся Billboards и Highlights
-    pcall(function()
-        for _, obj in ipairs(game:GetService("Players"):GetPlayers()) do
-            if obj.Character then
-                for _, c in ipairs(obj.Character:GetChildren()) do
-                    if c:IsA("Highlight") or c:IsA("BillboardGui") or c:IsA("BoxHandleAdornment") then
-                        c:Destroy()
-                    end
-                end
-            end
-        end
-    end)
-
-    print("[AkrivHub] ✓ Все скрипты остановлены.")
-end
-
--- =====================================================
---  ПАРСЕР scripts.txt
--- =====================================================
-local function parseAll(content)
-    local result = {}
-    local lines = {}
-    for line in content:gmatch("[^\r\n]+") do
-        table.insert(lines, line)
-    end
-
-    for i, line in ipairs(lines) do
-        if line:find("loadstring") and line:find("HttpGet") then
-            local url = line:match('HttpGet%("([^"]+)"')
-                     or line:match("HttpGet%('([^']+)'")
-                     or line:match('"([^"]+)"')
-
-            local gameName, hubName = nil, nil
-            for j = i - 1, math.max(1, i - 4), -1 do
-                local prev = lines[j]
-                if not prev:match("^%s*$")
-                   and not prev:find("loadstring")
-                   and not prev:match("^%s*#")
-                   and not prev:match("^%s*[-=]+%s*$") then
-                    local g, h = prev:match("^(.+)%s+[—%-–:]%s+(.+)$")
-                    if g and h then
-                        gameName = g:gsub("%s+$", ""):gsub("^%s+", "")
-                        hubName = h:gsub("%s+$", ""):gsub("^%s+", "")
-                        break
-                    end
-                    if not hubName then
-                        hubName = prev:gsub("%s+$", ""):gsub("^%s+", "")
-                        gameName = "—"
-                        break
-                    end
-                end
-            end
-
-            if url and hubName then
-                table.insert(result, {
-                    game = gameName or "—",
-                    name = hubName or "Скрипт",
-                    url = url,
-                    loadstring = line,
-                })
-            end
-        end
-    end
-    return result
-end
-
-local function loadScripts()
-    local ok, res = pcall(function()
-        return game:HttpGet(SCRIPTS_URL, true)
-    end)
-    if not ok or not res or #res < 50 then
-        warn("[AkrivHub] Не удалось загрузить scripts.txt")
-        return false
-    end
-    scripts = parseAll(res)
-    isLoaded = true
-    print("[AkrivHub] Загружено скриптов: " .. #scripts)
-    return true
-end
-
-local function runLoadstring(line, name)
-    if not line or line == "" then return false end
+local function runLoadstring(url, name)
+    if not url or url == "" then return false end
     print("[AkrivHub] Запускаю: " .. tostring(name))
     local ok, err = pcall(function()
-        local chunk = loadstring(line)
-        if not chunk then error("loadstring вернул nil") end
+        local source = game:HttpGet(url)
+        if not source or #source < 10 then error("Пустой ответ") end
+        local chunk = loadstring(source)
+        if not chunk then error("loadstring nil") end
         chunk()
     end)
     if not ok then
@@ -282,7 +228,7 @@ local function showLoading()
     sub.Size = UDim2.new(1, 0, 0, 24)
     sub.Position = UDim2.new(0, 0, 0, 78)
     sub.BackgroundTransparency = 1
-    sub.Text = "v5.3 | Kill Switch Edition"
+    sub.Text = "v1.0 Beta | Rounded UI"
     sub.TextColor3 = Color3.fromRGB(120, 120, 160)
     sub.Font = Enum.Font.Gotham
     sub.TextSize = 14
@@ -340,9 +286,10 @@ function showMainGui()
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = LP:WaitForChild("PlayerGui")
 
+    -- Главное окно
     local win = Instance.new("Frame")
-    win.Size = UDim2.new(0, 640, 0, 540)
-    win.Position = UDim2.new(0.5, -320, 0.5, -270)
+    win.Size = UDim2.new(0, 640, 0, 500)
+    win.Position = UDim2.new(0.5, -320, 0.5, -250)
     win.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
     win.BorderSizePixel = 0
     win.Active = true
@@ -358,19 +305,21 @@ function showMainGui()
     stroke.Thickness = 1.5
     stroke.Parent = win
 
+    -- Анимация появления
     win.Size = UDim2.new(0, 0, 0, 0)
     win.Position = UDim2.new(0.5, 0, 0.5, 0)
     TweenService:Create(win, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 640, 0, 540),
-        Position = UDim2.new(0.5, -320, 0.5, -270)
+        Size = UDim2.new(0, 640, 0, 500),
+        Position = UDim2.new(0.5, -320, 0.5, -250)
     }):Play()
 
-    -- Заголовок
+    -- ===== ЗАГОЛОВОК =====
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, 0, 0, 44)
     header.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
     header.BorderSizePixel = 0
     header.Parent = win
+
     local headerCorner = Instance.new("UICorner")
     headerCorner.CornerRadius = UDim.new(0, 16)
     headerCorner.Parent = header
@@ -379,7 +328,7 @@ function showMainGui()
     title.Size = UDim2.new(1, -160, 1, 0)
     title.Position = UDim2.new(0, 18, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "AkrivHub | v5.3"
+    title.Text = "AkrivHub | v1.0 Beta"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 16
@@ -387,17 +336,17 @@ function showMainGui()
     title.Parent = header
 
     local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(0, 260, 1, 0)
+    subtitle.Size = UDim2.new(0, 220, 1, 0)
     subtitle.Position = UDim2.new(0, 160, 0, 0)
     subtitle.BackgroundTransparency = 1
-    subtitle.Text = "| Loading..."
+    subtitle.Text = "| 20+ scripts"
     subtitle.TextColor3 = Color3.fromRGB(100, 100, 140)
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 11
     subtitle.TextXAlignment = Enum.TextXAlignment.Left
     subtitle.Parent = header
 
-    -- Свернуть
+    -- Кнопка сворачивания
     local collapseBtn = Instance.new("TextButton")
     collapseBtn.Size = UDim2.new(0, 28, 0, 28)
     collapseBtn.Position = UDim2.new(1, -70, 0, 8)
@@ -408,9 +357,12 @@ function showMainGui()
     collapseBtn.Font = Enum.Font.GothamBold
     collapseBtn.TextSize = 16
     collapseBtn.Parent = header
-    local cc = Instance.new("UICorner"); cc.CornerRadius = UDim.new(0, 8); cc.Parent = collapseBtn
 
-    -- Закрыть
+    local collapseCorner = Instance.new("UICorner")
+    collapseCorner.CornerRadius = UDim.new(0, 8)
+    collapseCorner.Parent = collapseBtn
+
+    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 28, 0, 28)
     closeBtn.Position = UDim2.new(1, -36, 0, 8)
@@ -421,7 +373,10 @@ function showMainGui()
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 18
     closeBtn.Parent = header
-    local cc2 = Instance.new("UICorner"); cc2.CornerRadius = UDim.new(0, 8); cc2.Parent = closeBtn
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = closeBtn
 
     closeBtn.MouseButton1Click:Connect(function()
         TweenService:Create(win, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
@@ -433,14 +388,17 @@ function showMainGui()
         sg:Destroy()
     end)
 
-    -- Поиск
+    -- ===== ПОИСК =====
     local searchFrame = Instance.new("Frame")
     searchFrame.Size = UDim2.new(1, -30, 0, 40)
     searchFrame.Position = UDim2.new(0, 15, 0, 56)
     searchFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
     searchFrame.BorderSizePixel = 0
     searchFrame.Parent = win
-    local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(0, 10); sc.Parent = searchFrame
+
+    local searchCorner = Instance.new("UICorner")
+    searchCorner.CornerRadius = UDim.new(0, 10)
+    searchCorner.Parent = searchFrame
 
     local searchBox = Instance.new("TextBox")
     searchBox.Size = UDim2.new(1, -20, 1, 0)
@@ -456,9 +414,9 @@ function showMainGui()
     searchBox.ClearTextOnFocus = false
     searchBox.Parent = searchFrame
 
-    -- Список
+    -- ===== СПИСОК СКРИПТОВ =====
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -30, 1, -220)
+    scroll.Size = UDim2.new(1, -30, 1, -140)
     scroll.Position = UDim2.new(0, 15, 0, 106)
     scroll.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
     scroll.BorderSizePixel = 0
@@ -467,99 +425,28 @@ function showMainGui()
     scroll.ScrollBarThickness = 4
     scroll.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 90)
     scroll.Parent = win
-    local scc = Instance.new("UICorner"); scc.CornerRadius = UDim.new(0, 10); scc.Parent = scroll
+
+    local scrollCorner = Instance.new("UICorner")
+    scrollCorner.CornerRadius = UDim.new(0, 10)
+    scrollCorner.Parent = scroll
 
     local listLayout = Instance.new("UIListLayout")
     listLayout.Padding = UDim.new(0, 6)
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = scroll
 
-    -- Кнопки управления (Anti-AFK / Rejoin)
-    local toggles = Instance.new("Frame")
-    toggles.Size = UDim2.new(1, -30, 0, 32)
-    toggles.Position = UDim2.new(0, 15, 1, -106)
-    toggles.BackgroundTransparency = 1
-    toggles.Parent = win
-
-    local afkBtn = Instance.new("TextButton")
-    afkBtn.Size = UDim2.new(0.5, -5, 1, 0)
-    afkBtn.Position = UDim2.new(0, 0, 0, 0)
-    afkBtn.BackgroundColor3 = Color3.fromRGB(55, 140, 70)
-    afkBtn.BorderSizePixel = 0
-    afkBtn.Text = "Anti-AFK: ON"
-    afkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    afkBtn.Font = Enum.Font.GothamBold
-    afkBtn.TextSize = 11
-    afkBtn.Parent = toggles
-    local afkCorner = Instance.new("UICorner"); afkCorner.CornerRadius = UDim.new(0, 8); afkCorner.Parent = afkBtn
-
-    afkBtn.MouseButton1Click:Connect(function()
-        ANTI_AFK_ENABLED = not ANTI_AFK_ENABLED
-        afkBtn.Text = "Anti-AFK: " .. (ANTI_AFK_ENABLED and "ON" or "OFF")
-        afkBtn.BackgroundColor3 = ANTI_AFK_ENABLED and Color3.fromRGB(55, 140, 70) or Color3.fromRGB(50, 50, 70)
-    end)
-
-    local rejoinBtn = Instance.new("TextButton")
-    rejoinBtn.Size = UDim2.new(0.5, -5, 1, 0)
-    rejoinBtn.Position = UDim2.new(0.5, 5, 0, 0)
-    rejoinBtn.BackgroundColor3 = Color3.fromRGB(60, 90, 160)
-    rejoinBtn.BorderSizePixel = 0
-    rejoinBtn.Text = "Rejoin"
-    rejoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    rejoinBtn.Font = Enum.Font.GothamBold
-    rejoinBtn.TextSize = 11
-    rejoinBtn.Parent = toggles
-    local rejoinCorner = Instance.new("UICorner"); rejoinCorner.CornerRadius = UDim.new(0, 8); rejoinCorner.Parent = rejoinBtn
-
-    rejoinBtn.MouseButton1Click:Connect(function()
-        pcall(function()
-            game:GetService("TeleportService"):Teleport(game.PlaceId, LP)
-        end)
-    end)
-
-    -- 🚨 KILL ALL SCRIPTS BUTTON
-    local killBtn = Instance.new("TextButton")
-    killBtn.Size = UDim2.new(1, -30, 0, 40)
-    killBtn.Position = UDim2.new(0, 15, 1, -66)
-    killBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 50)
-    killBtn.BorderSizePixel = 0
-    killBtn.Text = "☠ KILL ALL SCRIPTS"
-    killBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    killBtn.Font = Enum.Font.GothamBlack
-    killBtn.TextSize = 13
-    killBtn.Parent = win
-    local killCorner = Instance.new("UICorner"); killCorner.CornerRadius = UDim.new(0, 10); killCorner.Parent = killBtn
-
-    killBtn.MouseButton1Click:Connect(function()
-        killBtn.Text = "Останавливаю..."
-        killBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 40)
-
-        -- Сначала запускаем убийство
-        task.spawn(function()
-            killAllScripts()
-
-            -- Если хаб каким-то чудом ещё жив — дожимаем через 1 секунду
-            task.wait(1)
-            pcall(function()
-                for _, obj in ipairs(LP:FindFirstChild("PlayerGui"):GetChildren()) do
-                    if obj:IsA("ScreenGui") then obj:Destroy() end
-                end
-            end)
-        end)
-    end)
-
-    -- Футер
+    -- ===== ФУТЕР =====
     local footer = Instance.new("TextLabel")
-    footer.Size = UDim2.new(1, -30, 0, 18)
-    footer.Position = UDim2.new(0, 15, 1, -22)
+    footer.Size = UDim2.new(1, -30, 0, 22)
+    footer.Position = UDim2.new(0, 15, 1, -28)
     footer.BackgroundTransparency = 1
-    footer.Text = "by akriv1s  •  Right Shift — свернуть  •  Kill — вырубить всё"
+    footer.Text = "by akriv1s  •  Right Shift — свернуть"
     footer.TextColor3 = Color3.fromRGB(80, 80, 110)
     footer.Font = Enum.Font.Gotham
     footer.TextSize = 10
     footer.Parent = win
 
-    -- Логика
+    -- ===== ЛОГИКА ОТОБРАЖЕНИЯ =====
     local function clearList()
         for _, c in ipairs(scroll:GetChildren()) do
             if c:IsA("Frame") or c:IsA("TextLabel") then c:Destroy() end
@@ -568,6 +455,7 @@ function showMainGui()
 
     local function renderCards(list)
         clearList()
+
         if #list == 0 then
             local lbl = Instance.new("TextLabel")
             lbl.Size = UDim2.new(1, 0, 0, 40)
@@ -581,14 +469,19 @@ function showMainGui()
         end
 
         for i, script in ipairs(list) do
+            -- Карточка
             local card = Instance.new("Frame")
             card.Size = UDim2.new(1, 0, 0, 68)
             card.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
             card.BorderSizePixel = 0
             card.LayoutOrder = i
             card.Parent = scroll
-            local cardCorner = Instance.new("UICorner"); cardCorner.CornerRadius = UDim.new(0, 10); cardCorner.Parent = card
 
+            local cardCorner = Instance.new("UICorner")
+            cardCorner.CornerRadius = UDim.new(0, 10)
+            cardCorner.Parent = card
+
+            -- Название скрипта
             local nameL = Instance.new("TextLabel")
             nameL.Size = UDim2.new(1, -110, 0, 20)
             nameL.Position = UDim2.new(0, 14, 0, 8)
@@ -601,6 +494,7 @@ function showMainGui()
             nameL.TextTruncate = Enum.TextTruncate.AtEnd
             nameL.Parent = card
 
+            -- Игра
             local gameL = Instance.new("TextLabel")
             gameL.Size = UDim2.new(1, -110, 0, 14)
             gameL.Position = UDim2.new(0, 14, 0, 30)
@@ -613,6 +507,7 @@ function showMainGui()
             gameL.TextTruncate = Enum.TextTruncate.AtEnd
             gameL.Parent = card
 
+            -- Кнопка запуска
             local runBtn = Instance.new("TextButton")
             runBtn.Size = UDim2.new(0, 90, 0, 30)
             runBtn.Position = UDim2.new(1, -102, 0.5, -15)
@@ -623,13 +518,16 @@ function showMainGui()
             runBtn.Font = Enum.Font.GothamBold
             runBtn.TextSize = 11
             runBtn.Parent = card
-            local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(0, 8); rc.Parent = runBtn
+
+            local runCorner = Instance.new("UICorner")
+            runCorner.CornerRadius = UDim.new(0, 8)
+            runCorner.Parent = runBtn
 
             runBtn.MouseButton1Click:Connect(function()
                 runBtn.Text = "..."
                 runBtn.BackgroundColor3 = Color3.fromRGB(180, 150, 60)
                 task.spawn(function()
-                    local ok = runLoadstring(script.loadstring, script.name)
+                    local ok = runLoadstring(script.url, script.name)
                     task.wait(0.3)
                     runBtn.Text = ok and "✓ ОК" or "✕ Ошибка"
                     runBtn.BackgroundColor3 = ok and Color3.fromRGB(55, 140, 70) or Color3.fromRGB(180, 60, 60)
@@ -641,11 +539,15 @@ function showMainGui()
         end
     end
 
+    -- ===== ФИЛЬТРАЦИЯ =====
     local function applyFilter(query)
-        if query == "" then renderCards(scripts) return end
+        if query == "" then
+            renderCards(SCRIPTS)
+            return
+        end
         local q = query:lower()
         local filtered = {}
-        for _, s in ipairs(scripts) do
+        for _, s in ipairs(SCRIPTS) do
             if s.name:lower():find(q, 1, true) or s.game:lower():find(q, 1, true) then
                 table.insert(filtered, s)
             end
@@ -657,30 +559,25 @@ function showMainGui()
         applyFilter(searchBox.Text)
     end)
 
-    task.spawn(function()
-        while not isLoaded do task.wait(0.2) end
-        subtitle.Text = "| " .. tostring(#scripts) .. " scripts"
-        renderCards(scripts)
-    end)
+    -- Первичный рендер
+    renderCards(SCRIPTS)
 
-    -- Сворачивание
+    -- ===== СВОРАЧИВАНИЕ =====
     local isCollapsed = false
-    local fullSize = UDim2.new(0, 640, 0, 540)
-    local fullPos = UDim2.new(0.5, -320, 0.5, -270)
+    local fullSize = UDim2.new(0, 640, 0, 500)
+    local fullPos = UDim2.new(0.5, -320, 0.5, -250)
 
     local function setCollapsed(col)
         isCollapsed = col
         if col then
             TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 200, 0, 50), Position = UDim2.new(0, 20, 0, 20)
+                Size = UDim2.new(0, 180, 0, 50), Position = UDim2.new(0, 20, 0, 20)
             }):Play()
             collapseBtn.Text = "+"
             searchFrame.Visible = false
             scroll.Visible = false
-            toggles.Visible = false
-            killBtn.Visible = false
             footer.Visible = false
-            subtitle.Text = "• Anti-AFK + Kill"
+            subtitle.Text = "• свёрнуто"
         else
             TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                 Size = fullSize, Position = fullPos
@@ -688,10 +585,8 @@ function showMainGui()
             collapseBtn.Text = "−"
             searchFrame.Visible = true
             scroll.Visible = true
-            toggles.Visible = true
-            killBtn.Visible = true
             footer.Visible = true
-            subtitle.Text = "| " .. tostring(#scripts) .. " scripts"
+            subtitle.Text = "| " .. tostring(#SCRIPTS) .. " scripts"
         end
     end
 
@@ -708,12 +603,6 @@ end
 --  СТАРТ
 -- =====================================================
 task.wait(0.5)
-
-startAntiAFK()
 showLoading()
 
-task.spawn(function()
-    loadScripts()
-end)
-
-print("[AkrivHub v5.3] Загружен. Anti-AFK + Kill Switch активны.")
+print("[AkrivHub v1.0 Beta] Загружен. RightShift — свернуть/развернуть.")
