@@ -1,7 +1,6 @@
 -- =====================================================
---  Game Script Finder v2.0 | by akriv1s
---  Поиск игр через Roblox Search API + скрипты из ScriptBlox и RoScripts
--- v2
+--  Game Script Finder v2.1 | by akriv1s
+--  Поиск игр через roproxy + скрипты из ScriptBlox и RoScripts
 -- =====================================================
 
 local Players      = game:GetService("Players")
@@ -38,17 +37,21 @@ local function jsonDecode(str)
     return res
 end
 
--- ==================== ПОИСК ИГРЫ (НОВЫЙ API) ====================
+-- ==================== ПОИСК ИГРЫ (ЧЕРЕЗ ПРОКСИ) ====================
 local function searchGameByName(gameName)
     -- URL-энкодинг названия
     local encoded = gameName:gsub(" ", "%%20"):gsub("[^%w%%]", function(c)
         return string.format("%%%02X", string.byte(c))
     end)
 
-    -- Пробуем несколько эндпоинтов по очереди
+    -- Пробуем несколько прокси и эндпоинтов по очереди
     local endpoints = {
-        "https://apis.roblox.com/search-api/omni-search?searchQuery=" .. encoded .. "&sessionId=0&pageType=all",
-        "https://games.roblox.com/v1/games/list?model.keyword=" .. encoded .. "&model.maxRows=10",
+        -- 1. Официальный API через roproxy
+        "https://apis.roproxy.com/search-api/omni-search?searchQuery=" .. encoded .. "&sessionId=0&pageType=all",
+        -- 2. Старый API через roproxy
+        "https://games.roproxy.com/v1/games/list?model.keyword=" .. encoded .. "&model.maxRows=10",
+        -- 3. Rotunnel (альтернативный прокси, указан в документации)
+        "https://apis.rotunnel.com/search-api/omni-search?searchQuery=" .. encoded .. "&sessionId=0&pageType=all",
     }
 
     for _, url in ipairs(endpoints) do
@@ -71,15 +74,15 @@ local function searchGameByName(gameName)
             end
         end
     end
-    return nil, "Игра не найдена"
+    return nil, "Игра не найдена (проверь название или попробуй позже)"
 end
 
--- ==================== ПОИСК СКРИПТОВ (2 ИСТОЧНИКА) ====================
+-- ==================== ПОИСК СКРИПТОВ ====================
 local function searchScriptBlox(gameName, placeId)
     local results = {}
     local encoded = gameName:gsub(" ", "%%20")
 
-    -- 1. Поиск по названию игры
+    -- 1. Поиск по названию игры через официальный API
     local url1 = "https://scriptblox.com/api/script/search?q=" .. encoded .. "&max=15"
     local res1, err1 = httpGet(url1)
     if res1 then
@@ -98,7 +101,7 @@ local function searchScriptBlox(gameName, placeId)
         end
     end
 
-    -- 2. Дополнительный поиск по placeId, если есть
+    -- 2. Дополнительный поиск по placeId
     if placeId then
         local url2 = "https://scriptblox.com/api/script/search?placeId=" .. tostring(placeId) .. "&max=15"
         local res2 = httpGet(url2)
@@ -106,7 +109,6 @@ local function searchScriptBlox(gameName, placeId)
             local data2 = jsonDecode(res2)
             if data2 and data2.result and data2.result.scripts then
                 for _, s in ipairs(data2.result.scripts) do
-                    -- Проверяем, нет ли дубликата
                     local exists = false
                     for _, existing in ipairs(results) do
                         if existing.title == s.title then exists = true break end
@@ -144,9 +146,9 @@ local function searchRoScripts(gameName)
                 game = s.game and s.game.name or gameName,
                 views = s.views or 0,
                 verified = s.verified or false,
-                script = s.loadstring, -- RoScripts отдаёт готовую loadstring-ссылку
+                script = s.loadstring,
                 source = "RoScripts",
-                isLoadstring = true -- флаг: не код, а ссылка
+                isLoadstring = true
             })
         end
     end
@@ -155,10 +157,10 @@ end
 
 -- ==================== ОБЪЕДИНЕНИЕ РЕЗУЛЬТАТОВ ====================
 local function findScripts(gameName)
-    -- Сначала ищем игру, чтобы получить placeId
+    -- Сначала ищем игру через прокси
     local placeId, foundName = searchGameByName(gameName)
     if not placeId then
-        return nil, "Игра не найдена. Проверь название."
+        return nil, "Игра не найдена. Проверь название или попробуй позже."
     end
 
     -- Собираем скрипты из обоих источников
@@ -170,7 +172,7 @@ local function findScripts(gameName)
     local rsScripts = searchRoScripts(gameName)
     for _, s in ipairs(rsScripts) do table.insert(allScripts, s) end
 
-    -- Сортировка: сначала верифицированные, потом по просмотрам
+    -- Сортировка
     table.sort(allScripts, function(a, b)
         if a.verified and not b.verified then return true end
         if not a.verified and b.verified then return false end
@@ -192,12 +194,10 @@ local function runScript(scriptData, name)
     local ok, err = pcall(function()
         local code
         if type(scriptData) == "table" and scriptData.isLoadstring then
-            -- RoScripts: scriptData — это уже готовая loadstring-ссылка
             code = scriptData.script
             if not code then error("Нет loadstring-ссылки") end
             loadstring(game:HttpGet(code))()
         else
-            -- ScriptBlox: scriptData — это исходный код
             code = scriptData
             local chunk = loadstring(code)
             if not chunk then error("loadstring вернул nil") end
@@ -286,7 +286,7 @@ local function showLoading()
     sub.Size = UDim2.new(1, 0, 0, 24)
     sub.Position = UDim2.new(0, 0, 0, 78)
     sub.BackgroundTransparency = 1
-    sub.Text = "v2.0 by akriv1s"
+    sub.Text = "v2.1 by akriv1s"
     sub.TextColor3 = Color3.fromRGB(120, 120, 160)
     sub.Font = Enum.Font.Gotham
     sub.TextSize = 14
@@ -344,7 +344,6 @@ function showMainGui()
     sg.Parent = LP:WaitForChild("PlayerGui")
     state.mainGui = sg
 
-    -- Главное окно
     local win = Instance.new("Frame")
     win.Size = UDim2.new(0, 620, 0, 480)
     win.Position = UDim2.new(0.5, -310, 0.5, -240)
@@ -363,7 +362,6 @@ function showMainGui()
     stroke.Thickness = 1.5
     stroke.Parent = win
 
-    -- Анимация появления
     win.Size = UDim2.new(0, 0, 0, 0)
     win.Position = UDim2.new(0.5, 0, 0.5, 0)
     TweenService:Create(win, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -404,7 +402,6 @@ function showMainGui()
     subtitle.TextXAlignment = Enum.TextXAlignment.Left
     subtitle.Parent = header
 
-    -- Кнопка сворачивания
     local collapseBtn = Instance.new("TextButton")
     collapseBtn.Size = UDim2.new(0, 28, 0, 28)
     collapseBtn.Position = UDim2.new(1, -70, 0, 8)
@@ -420,7 +417,6 @@ function showMainGui()
     collapseCorner.CornerRadius = UDim.new(0, 8)
     collapseCorner.Parent = collapseBtn
 
-    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 28, 0, 28)
     closeBtn.Position = UDim2.new(1, -36, 0, 8)
@@ -520,7 +516,6 @@ function showMainGui()
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = scroll
 
-    -- ===== ФУТЕР =====
     local footer = Instance.new("TextLabel")
     footer.Size = UDim2.new(1, -30, 0, 22)
     footer.Position = UDim2.new(0, 15, 1, -28)
@@ -707,4 +702,4 @@ end
 task.wait(0.5)
 showLoading()
 
-print("[Game Script Finder v2.0] Загружен. Ищи игры через поле ввода.")
+print("[Game Script Finder v2.1] Загружен. Ищи игры через поле ввода.")
