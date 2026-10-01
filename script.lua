@@ -1,20 +1,139 @@
 -- =====================================================
---  AkrivHub v5.1 | Universal Parser (by akriv1s)
---  Парсит ВСЕ loadstring из scripts.txt без зависимости от формата
+--  AkrivHub v5.3 | Kill Switch Edition
+--  by akriv1s
 -- =====================================================
 
 local Players      = game:GetService("Players")
 local UIS          = game:GetService("UserInputService")
-local HttpService  = game:GetService("HttpService")
+local VIM          = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
 local LP           = Players.LocalPlayer
 
 local SCRIPTS_URL = "https://raw.githubusercontent.com/akriv1s/scripts/refs/heads/main/scripts.txt"
 
-local scripts = {}  -- плоский список: { {game="", name="", url="", loadstring=""} }
+local scripts = {}
 local isLoaded = false
 
--- ==================== УНИВЕРСАЛЬНЫЙ ПАРСЕР ====================
+-- =====================================================
+--  ANTI-AFK
+-- =====================================================
+local ANTI_AFK_ENABLED = true
+local ANTI_AFK_INTERVAL = 30
+
+local function startAntiAFK()
+    task.spawn(function()
+        while true do
+            task.wait(ANTI_AFK_INTERVAL)
+            if ANTI_AFK_ENABLED then
+                pcall(function()
+                    VIM:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                    task.wait(0.05)
+                    VIM:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+                    local vu = game:GetService("VirtualUser")
+                    vu:CaptureController()
+                    vu:ClickButton2(Vector2.new())
+                end)
+            end
+        end
+    end)
+end
+
+-- =====================================================
+--  KILL ALL SCRIPTS — ядерная кнопка
+-- =====================================================
+local function killAllScripts()
+    print("[AkrivHub] ⚠ KILL SWITCH: остановка всех скриптов...")
+
+    -- 1. Уничтожаем ВСЕ ScreenGui в PlayerGui
+    local pg = LP:FindFirstChild("PlayerGui")
+    if pg then
+        for _, obj in ipairs(pg:GetChildren()) do
+            if obj:IsA("ScreenGui") then
+                pcall(function() obj:Destroy() end)
+            end
+        end
+    end
+
+    -- 2. Уничтожаем CoreGui (там часто прячутся читы)
+    local cg = game:GetService("CoreGui")
+    for _, obj in ipairs(cg:GetChildren()) do
+        if obj:IsA("ScreenGui") and obj.Name ~= "RobloxGui" then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+
+    -- 3. Отключаем все Connections (если исполнитель поддерживает)
+    if getconnections then
+        local connections = getconnections(game:GetService("RunService").Heartbeat)
+        for _, conn in ipairs(connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        connections = getconnections(game:GetService("RunService").RenderStepped)
+        for _, conn in ipairs(connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+    end
+
+    -- 4. Останавливаем все Loop-потоки Lua (мягко)
+    pcall(function()
+        for _, thread in ipairs(debug and debug.getthreads and debug.getthreads() or {}) do
+            if coroutine.status(thread) == "suspended" or coroutine.status(thread) == "running" then
+                pcall(function() task.cancel(thread) end)
+            end
+        end
+    end)
+
+    -- 5. Возвращаем скорость игрока к норме
+    pcall(function()
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+        end
+    end)
+
+    -- 6. Возвращаем Lighting к дефолту
+    pcall(function()
+        local Light = game:GetService("Lighting")
+        Light.Ambient = Color3.fromRGB(70, 70, 70)
+        Light.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Light.Brightness = 2
+        Light.FogEnd = 100000
+        Light.GlobalShadows = true
+    end)
+
+    -- 7. Убираем тело полёта, если есть
+    pcall(function()
+        local char = LP.Character
+        if char then
+            for _, obj in ipairs(char:GetDescendants()) do
+                if obj:IsA("BodyVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyGyro") then
+                    obj:Destroy()
+                end
+            end
+        end
+    end)
+
+    -- 8. Убираем оставшиеся Billboards и Highlights
+    pcall(function()
+        for _, obj in ipairs(game:GetService("Players"):GetPlayers()) do
+            if obj.Character then
+                for _, c in ipairs(obj.Character:GetChildren()) do
+                    if c:IsA("Highlight") or c:IsA("BillboardGui") or c:IsA("BoxHandleAdornment") then
+                        c:Destroy()
+                    end
+                end
+            end
+        end
+    end)
+
+    print("[AkrivHub] ✓ Все скрипты остановлены.")
+end
+
+-- =====================================================
+--  ПАРСЕР scripts.txt
+-- =====================================================
 local function parseAll(content)
     local result = {}
     local lines = {}
@@ -23,32 +142,24 @@ local function parseAll(content)
     end
 
     for i, line in ipairs(lines) do
-        -- Ищем loadstring строку
         if line:find("loadstring") and line:find("HttpGet") then
-            -- Извлекаем URL
-            local url = line:match('HttpGet%("([^"]+)"') 
+            local url = line:match('HttpGet%("([^"]+)"')
                      or line:match("HttpGet%('([^']+)'")
                      or line:match('"([^"]+)"')
 
-            -- Ищем название выше (до 4 строк)
             local gameName, hubName = nil, nil
             for j = i - 1, math.max(1, i - 4), -1 do
                 local prev = lines[j]
-                -- Пропускаем пустые, категории, комментарии
                 if not prev:match("^%s*$")
                    and not prev:find("loadstring")
                    and not prev:match("^%s*#")
                    and not prev:match("^%s*[-=]+%s*$") then
-
-                    -- Формат: "Игра — Название" или "Игра - Название" или "Игра: Название"
                     local g, h = prev:match("^(.+)%s+[—%-–:]%s+(.+)$")
                     if g and h then
                         gameName = g:gsub("%s+$", ""):gsub("^%s+", "")
                         hubName = h:gsub("%s+$", ""):gsub("^%s+", "")
                         break
                     end
-
-                    -- Если тире нет — берём всю строку как название
                     if not hubName then
                         hubName = prev:gsub("%s+$", ""):gsub("^%s+", "")
                         gameName = "—"
@@ -67,28 +178,23 @@ local function parseAll(content)
             end
         end
     end
-
     return result
 end
 
--- ==================== ЗАГРУЗКА ====================
 local function loadScripts()
     local ok, res = pcall(function()
         return game:HttpGet(SCRIPTS_URL, true)
     end)
-
     if not ok or not res or #res < 50 then
-        warn("[AkrivHub] Не удалось загрузить scripts.txt: " .. tostring(res))
+        warn("[AkrivHub] Не удалось загрузить scripts.txt")
         return false
     end
-
     scripts = parseAll(res)
     isLoaded = true
     print("[AkrivHub] Загружено скриптов: " .. #scripts)
     return true
 end
 
--- ==================== ЗАПУСК ====================
 local function runLoadstring(line, name)
     if not line or line == "" then return false end
     print("[AkrivHub] Запускаю: " .. tostring(name))
@@ -104,7 +210,9 @@ local function runLoadstring(line, name)
     return true
 end
 
--- ==================== ПАРТИКЛЫ ====================
+-- =====================================================
+--  ПАРТИКЛЫ
+-- =====================================================
 local function createLoadingParticles(parent)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 1, 0)
@@ -135,7 +243,9 @@ local function createLoadingParticles(parent)
     end
 end
 
--- ==================== ЭКРАН ЗАГРУЗКИ ====================
+-- =====================================================
+--  ЭКРАН ЗАГРУЗКИ
+-- =====================================================
 local function showLoading()
     local sg = Instance.new("ScreenGui")
     sg.Name = "AkrivHubLoading"
@@ -172,7 +282,7 @@ local function showLoading()
     sub.Size = UDim2.new(1, 0, 0, 24)
     sub.Position = UDim2.new(0, 0, 0, 78)
     sub.BackgroundTransparency = 1
-    sub.Text = "Beta v5.1 | Universal Parser"
+    sub.Text = "v5.3 | Kill Switch Edition"
     sub.TextColor3 = Color3.fromRGB(120, 120, 160)
     sub.Font = Enum.Font.Gotham
     sub.TextSize = 14
@@ -219,7 +329,9 @@ local function showLoading()
     end)
 end
 
--- ==================== ГЛАВНЫЙ GUI ====================
+-- =====================================================
+--  ГЛАВНЫЙ GUI
+-- =====================================================
 function showMainGui()
     local sg = Instance.new("ScreenGui")
     sg.Name = "AkrivHub"
@@ -229,8 +341,8 @@ function showMainGui()
     sg.Parent = LP:WaitForChild("PlayerGui")
 
     local win = Instance.new("Frame")
-    win.Size = UDim2.new(0, 640, 0, 500)
-    win.Position = UDim2.new(0.5, -320, 0.5, -250)
+    win.Size = UDim2.new(0, 640, 0, 540)
+    win.Position = UDim2.new(0.5, -320, 0.5, -270)
     win.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
     win.BorderSizePixel = 0
     win.Active = true
@@ -249,8 +361,8 @@ function showMainGui()
     win.Size = UDim2.new(0, 0, 0, 0)
     win.Position = UDim2.new(0.5, 0, 0.5, 0)
     TweenService:Create(win, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 640, 0, 500),
-        Position = UDim2.new(0.5, -320, 0.5, -250)
+        Size = UDim2.new(0, 640, 0, 540),
+        Position = UDim2.new(0.5, -320, 0.5, -270)
     }):Play()
 
     -- Заголовок
@@ -267,7 +379,7 @@ function showMainGui()
     title.Size = UDim2.new(1, -160, 1, 0)
     title.Position = UDim2.new(0, 18, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "AkrivHub | Beta v5.1"
+    title.Text = "AkrivHub | v5.3"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 16
@@ -275,8 +387,8 @@ function showMainGui()
     title.Parent = header
 
     local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(0, 220, 1, 0)
-    subtitle.Position = UDim2.new(0, 170, 0, 0)
+    subtitle.Size = UDim2.new(0, 260, 1, 0)
+    subtitle.Position = UDim2.new(0, 160, 0, 0)
     subtitle.BackgroundTransparency = 1
     subtitle.Text = "| Loading..."
     subtitle.TextColor3 = Color3.fromRGB(100, 100, 140)
@@ -346,7 +458,7 @@ function showMainGui()
 
     -- Список
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -30, 1, -140)
+    scroll.Size = UDim2.new(1, -30, 1, -220)
     scroll.Position = UDim2.new(0, 15, 0, 106)
     scroll.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
     scroll.BorderSizePixel = 0
@@ -362,18 +474,92 @@ function showMainGui()
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = scroll
 
+    -- Кнопки управления (Anti-AFK / Rejoin)
+    local toggles = Instance.new("Frame")
+    toggles.Size = UDim2.new(1, -30, 0, 32)
+    toggles.Position = UDim2.new(0, 15, 1, -106)
+    toggles.BackgroundTransparency = 1
+    toggles.Parent = win
+
+    local afkBtn = Instance.new("TextButton")
+    afkBtn.Size = UDim2.new(0.5, -5, 1, 0)
+    afkBtn.Position = UDim2.new(0, 0, 0, 0)
+    afkBtn.BackgroundColor3 = Color3.fromRGB(55, 140, 70)
+    afkBtn.BorderSizePixel = 0
+    afkBtn.Text = "Anti-AFK: ON"
+    afkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    afkBtn.Font = Enum.Font.GothamBold
+    afkBtn.TextSize = 11
+    afkBtn.Parent = toggles
+    local afkCorner = Instance.new("UICorner"); afkCorner.CornerRadius = UDim.new(0, 8); afkCorner.Parent = afkBtn
+
+    afkBtn.MouseButton1Click:Connect(function()
+        ANTI_AFK_ENABLED = not ANTI_AFK_ENABLED
+        afkBtn.Text = "Anti-AFK: " .. (ANTI_AFK_ENABLED and "ON" or "OFF")
+        afkBtn.BackgroundColor3 = ANTI_AFK_ENABLED and Color3.fromRGB(55, 140, 70) or Color3.fromRGB(50, 50, 70)
+    end)
+
+    local rejoinBtn = Instance.new("TextButton")
+    rejoinBtn.Size = UDim2.new(0.5, -5, 1, 0)
+    rejoinBtn.Position = UDim2.new(0.5, 5, 0, 0)
+    rejoinBtn.BackgroundColor3 = Color3.fromRGB(60, 90, 160)
+    rejoinBtn.BorderSizePixel = 0
+    rejoinBtn.Text = "Rejoin"
+    rejoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    rejoinBtn.Font = Enum.Font.GothamBold
+    rejoinBtn.TextSize = 11
+    rejoinBtn.Parent = toggles
+    local rejoinCorner = Instance.new("UICorner"); rejoinCorner.CornerRadius = UDim.new(0, 8); rejoinCorner.Parent = rejoinBtn
+
+    rejoinBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            game:GetService("TeleportService"):Teleport(game.PlaceId, LP)
+        end)
+    end)
+
+    -- 🚨 KILL ALL SCRIPTS BUTTON
+    local killBtn = Instance.new("TextButton")
+    killBtn.Size = UDim2.new(1, -30, 0, 40)
+    killBtn.Position = UDim2.new(0, 15, 1, -66)
+    killBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 50)
+    killBtn.BorderSizePixel = 0
+    killBtn.Text = "☠ KILL ALL SCRIPTS"
+    killBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    killBtn.Font = Enum.Font.GothamBlack
+    killBtn.TextSize = 13
+    killBtn.Parent = win
+    local killCorner = Instance.new("UICorner"); killCorner.CornerRadius = UDim.new(0, 10); killCorner.Parent = killBtn
+
+    killBtn.MouseButton1Click:Connect(function()
+        killBtn.Text = "Останавливаю..."
+        killBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 40)
+
+        -- Сначала запускаем убийство
+        task.spawn(function()
+            killAllScripts()
+
+            -- Если хаб каким-то чудом ещё жив — дожимаем через 1 секунду
+            task.wait(1)
+            pcall(function()
+                for _, obj in ipairs(LP:FindFirstChild("PlayerGui"):GetChildren()) do
+                    if obj:IsA("ScreenGui") then obj:Destroy() end
+                end
+            end)
+        end)
+    end)
+
     -- Футер
     local footer = Instance.new("TextLabel")
-    footer.Size = UDim2.new(1, -30, 0, 22)
-    footer.Position = UDim2.new(0, 15, 1, -28)
+    footer.Size = UDim2.new(1, -30, 0, 18)
+    footer.Position = UDim2.new(0, 15, 1, -22)
     footer.BackgroundTransparency = 1
-    footer.Text = "by akriv1s  •  Right Shift — свернуть"
+    footer.Text = "by akriv1s  •  Right Shift — свернуть  •  Kill — вырубить всё"
     footer.TextColor3 = Color3.fromRGB(80, 80, 110)
     footer.Font = Enum.Font.Gotham
     footer.TextSize = 10
     footer.Parent = win
 
-    -- Логика отображения
+    -- Логика
     local function clearList()
         for _, c in ipairs(scroll:GetChildren()) do
             if c:IsA("Frame") or c:IsA("TextLabel") then c:Destroy() end
@@ -382,7 +568,6 @@ function showMainGui()
 
     local function renderCards(list)
         clearList()
-
         if #list == 0 then
             local lbl = Instance.new("TextLabel")
             lbl.Size = UDim2.new(1, 0, 0, 40)
@@ -456,12 +641,8 @@ function showMainGui()
         end
     end
 
-    -- Поиск
     local function applyFilter(query)
-        if query == "" then
-            renderCards(scripts)
-            return
-        end
+        if query == "" then renderCards(scripts) return end
         local q = query:lower()
         local filtered = {}
         for _, s in ipairs(scripts) do
@@ -476,7 +657,6 @@ function showMainGui()
         applyFilter(searchBox.Text)
     end)
 
-    -- Первичный рендер (когда скрипты уже загружены)
     task.spawn(function()
         while not isLoaded do task.wait(0.2) end
         subtitle.Text = "| " .. tostring(#scripts) .. " scripts"
@@ -485,20 +665,22 @@ function showMainGui()
 
     -- Сворачивание
     local isCollapsed = false
-    local fullSize = UDim2.new(0, 640, 0, 500)
-    local fullPos = UDim2.new(0.5, -320, 0.5, -250)
+    local fullSize = UDim2.new(0, 640, 0, 540)
+    local fullPos = UDim2.new(0.5, -320, 0.5, -270)
 
     local function setCollapsed(col)
         isCollapsed = col
         if col then
             TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 180, 0, 50), Position = UDim2.new(0, 20, 0, 20)
+                Size = UDim2.new(0, 200, 0, 50), Position = UDim2.new(0, 20, 0, 20)
             }):Play()
             collapseBtn.Text = "+"
             searchFrame.Visible = false
             scroll.Visible = false
+            toggles.Visible = false
+            killBtn.Visible = false
             footer.Visible = false
-            subtitle.Text = "• свёрнуто"
+            subtitle.Text = "• Anti-AFK + Kill"
         else
             TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
                 Size = fullSize, Position = fullPos
@@ -506,6 +688,8 @@ function showMainGui()
             collapseBtn.Text = "−"
             searchFrame.Visible = true
             scroll.Visible = true
+            toggles.Visible = true
+            killBtn.Visible = true
             footer.Visible = true
             subtitle.Text = "| " .. tostring(#scripts) .. " scripts"
         end
@@ -520,11 +704,16 @@ function showMainGui()
     end)
 end
 
--- ==================== СТАРТ ====================
+-- =====================================================
+--  СТАРТ
+-- =====================================================
 task.wait(0.5)
+
+startAntiAFK()
 showLoading()
+
 task.spawn(function()
     loadScripts()
 end)
 
-print("[AkrivHub v5.1] Загружен. RightShift — свернуть/развернуть.")
+print("[AkrivHub v5.3] Загружен. Anti-AFK + Kill Switch активны.")
