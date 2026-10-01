@@ -1,156 +1,151 @@
 -- =====================================================
---  AkrivHub v1.0 Beta | Rounded UI & Popular Scripts
+--  AkrivHub v1.1 Beta | Dynamic Loader
+--  Автоматически загружает скрипты из scripts.txt
 --  by akriv1s
 -- =====================================================
 
 local Players      = game:GetService("Players")
 local UIS          = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService  = game:GetService("HttpService")
 local LP           = Players.LocalPlayer
 
 -- =====================================================
---  СПИСОК СКРИПТОВ (20+ популярных игр)
+--  ИСТОЧНИК СПИСКА СКРИПТОВ
 -- =====================================================
-local SCRIPTS = {
-    -- Популярные игры
-    {
-        name = "Drive a Kukirin | Noxious Hub",
-        game = "Drive a Kukirin",
-        url = "https://raw.githubusercontent.com/NoxiousHub/Drive-A-kukurin-script/refs/heads/main/DriveAKukurin",
-        desc = "Anchor + Anti-AFK"
-    },
-    {
-        name = "Drive a Kukirin | SIFER HUB",
-        game = "Drive a Kukirin",
-        url = "https://rscripts.net/raw/sifer-hub-drive-a-kukirin_1743514612_r51z9nZBcN.txt",
-        desc = "Full Money Farm, Auto Quest, Full Progresses"
-    },
-    {
-        name = "+1 Mog Evolution | Ouroboros Hub",
-        game = "+1 Mog Evolution",
-        url = "https://raw.githubusercontent.com/joustingmatch/Ouroboros/main/loader.lua",
-        desc = "Auto Mog, Auto Win, Auto Rebirth"
-    },
-    {
-        name = "+1 Mog Evolution | Auto Ascend",
-        game = "+1 Mog Evolution",
-        url = "https://pastefy.app/j1ucezZ9/raw",
-        desc = "Auto Wins, Auto Click, Auto Ascend"
-    },
-    {
-        name = "A Desert | Keyless Menu",
-        game = "A desrt",
-        url = "https://robloxdatabase.com/scripts/a-desrt/", -- Страница со скриптом
-        desc = "Keyless menu for A desrt"
-    },
-    {
-        name = "Blox Fruits | Gravity Hub",
-        game = "Blox Fruits",
-        url = "https://raw.githubusercontent.com/Dev-NightMystic/Bloxfruits/refs/heads/main/Script.lua",
-        desc = "Auto Farm Magnet, Fishing"
-    },
-    {
-        name = "Blox Fruits | REDz Hub",
-        game = "Blox Fruits",
-        url = "https://raw.githubusercontent.com/REDzHUB/BloxFruits/main/redz9999.lua",
-        desc = "Auto Farm, Configurable Settings"
-    },
-    {
-        name = "Pet Simulator 99 | Auto Farm",
-        game = "Pet Simulator 99",
-        url = "https://raw.githubusercontent.com/REDzHUB/PetSimulator99/main/redz9999.lua",
-        desc = "Auto Farm, Auto Hatch"
-    },
-    {
-        name = "Grow a Garden | Auto Farm",
-        game = "Grow a Garden",
-        url = "https://raw.githubusercontent.com/epicisgood/Grow-a-Garden-Macro/main/script.lua",
-        desc = "Auto Plant, Auto Sell"
-    },
-    {
-        name = "Blade Ball | SP HUB",
-        game = "Blade Ball",
-        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/BladeBall.lua",
-        desc = "Auto Parry, ESP"
-    },
-    {
-        name = "Blade Ball | Auto Parry",
-        game = "Blade Ball",
-        url = "https://pastebin.com/raw/2frh8A2j",
-        desc = "Auto Parry script"
-    },
-    {
-        name = "Murder Mystery 2 | Forge Hub",
-        game = "Murder Mystery 2",
-        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/MM2.lua",
-        desc = "Kill All, ESP, Auto Farm"
-    },
-    {
-        name = "Murder Mystery 2 | Yarhm Hub",
-        game = "Murder Mystery 2",
-        url = "https://pastebin.com/raw/bS93UtUs",
-        desc = "Auto Farm, FPS Booster"
-    },
-    {
-        name = "Adopt Me | Auto Farm",
-        game = "Adopt Me",
-        url = "https://raw.githubusercontent.com/Ultra-Scripts/AdoptmeScript/main/AdoptmeScript/JI5PMVG-adopt-me.lua",
-        desc = "Auto Farm & Auto Neon"
-    },
-    {
-        name = "Brookhaven | LOLA HUB",
-        game = "Brookhaven",
-        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Brookhaven.lua",
-        desc = "Troll, ESP, Kill, Teleport"
-    },
-    {
-        name = "Jailbreak | Spark Hub",
-        game = "Jailbreak",
-        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Jailbreak.lua",
-        desc = "Silent Aim, Auto Arrest"
-    },
-    {
-        name = "Universal | DUMI HUB",
-        game = "Universal",
-        url = "https://xenoscripts.com/script/universal-script-dumi-hub-aimbot-esp-etc",
-        desc = "Aimbot FOV, Aim Target Lock"
-    },
-    -- Другие популярные игры
-    {
-        name = "Arsenal | Aimbot + ESP",
-        game = "Arsenal",
-        url = "https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Arsenal.lua",
-        desc = "Aimbot, ESP, No Recoil"
-    },
-    {
-        name = "Doors | Entity ESP",
-        game = "Doors",
-        url = "https://pastebin.com/raw/2frh8A2j",
-        desc = "Entity ESP, Auto Skip"
-    },
-    {
-        name = "Prison Life | Reaper Aim",
-        game = "Prison Life",
-        url = "https://raw.githubusercontent.com/morenoffproScriptsRoblox/ReaperAim/refs/heads/main/README.md",
-        desc = "Aimbot, ESP, Kill All"
-    },
+local SCRIPTS_URL = "https://raw.githubusercontent.com/akriv1s/scripts/refs/heads/main/scripts.txt"
+
+-- =====================================================
+--  СОСТОЯНИЕ
+-- =====================================================
+local state = {
+    scripts       = {},       -- { { name, game, url, desc } }
+    isLoaded      = false,
+    loadProgress  = 0,
+    mainGui       = nil,
+    loadingGui    = nil,
 }
 
 -- =====================================================
---  ЛОГИКА ЗАГРУЗКИ
+--  ПАРСЕР scripts.txt
 -- =====================================================
-local function runLoadstring(url, name)
-    if not url or url == "" then return false end
-    print("[AkrivHub] Запускаю: " .. tostring(name))
+local function parseScripts(content)
+    local result = {}
+    local currentGame = "Разное"
+    local lines = {}
+
+    -- Разбиваем на строки, убираем \r
+    for line in content:gmatch("[^\r\n]+") do
+        line = line:gsub("\r", "")
+        table.insert(lines, line)
+    end
+
+    local i = 1
+    while i <= #lines do
+        local line = lines[i]
+
+        -- Категория (## Название)
+        local catMatch = line:match("^%s*##%s+(.+)$")
+        if catMatch then
+            currentGame = catMatch:gsub("%s+$", ""):gsub("^%s+", "")
+            i = i + 1
+
+            -- Пропускаем пустые строки
+            while i <= #lines and lines[i]:match("^%s*$") do i = i + 1 end
+
+            -- Читаем скрипты до следующей категории
+            while i <= #lines and not lines[i]:match("^%s*##") do
+                local entry = lines[i]
+                if not entry:match("^%s*$") then
+                    -- Пытаемся распарсить: "Название (описание)" или просто "Название"
+                    local name, desc = entry:match("^(.+)%s+%((.+)%)%s*$")
+                    if not name then
+                        name = entry
+                        desc = ""
+                    end
+
+                    -- Ищем URL в следующей строке
+                    local url = nil
+                    local j = i + 1
+                    while j <= #lines and lines[j]:match("^%s*$") do j = j + 1 end
+                    if j <= #lines then
+                        url = lines[j]:match("^%s*(https?://.+)$")
+                    end
+
+                    if url then
+                        table.insert(result, {
+                            name = name,
+                            game = currentGame,
+                            desc = desc,
+                            url  = url,
+                        })
+                        i = j + 1
+                    else
+                        -- URL не найден, пропускаем строку
+                        i = i + 1
+                    end
+                else
+                    i = i + 1
+                end
+            end
+        else
+            i = i + 1
+        end
+    end
+
+    return result
+end
+
+-- =====================================================
+--  ЗАГРУЗКА СПИСКА
+-- =====================================================
+local function loadScripts()
+    print("[AkrivHub] Загружаю scripts.txt...")
+    state.loadProgress = 0.3
+
+    local ok, res = pcall(function()
+        return game:HttpGet(SCRIPTS_URL, true)
+    end)
+
+    if not ok or not res or #res < 100 then
+        warn("[AkrivHub] Не удалось загрузить scripts.txt: " .. tostring(res))
+        state.loadProgress = 1
+        return false
+    end
+
+    state.loadProgress = 0.7
+    state.scripts = parseScripts(res)
+    state.isLoaded = true
+    state.loadProgress = 1
+
+    print("[AkrivHub] Загружено скриптов: " .. #state.scripts)
+    return true
+end
+
+-- =====================================================
+--  ЗАПУСК СКРИПТА
+-- =====================================================
+local function runScript(scriptData)
+    if not scriptData or not scriptData.url then
+        warn("[AkrivHub] Пустой URL")
+        return false
+    end
+
+    print("[AkrivHub] Запускаю: " .. scriptData.name)
     local ok, err = pcall(function()
-        local source = game:HttpGet(url)
-        if not source or #source < 10 then error("Пустой ответ") end
+        local source = game:HttpGet(scriptData.url)
+        if not source or #source < 10 then
+            error("Пустой ответ от сервера")
+        end
         local chunk = loadstring(source)
-        if not chunk then error("loadstring nil") end
+        if not chunk then
+            error("loadstring вернул nil")
+        end
         chunk()
     end)
+
     if not ok then
-        warn("[AkrivHub] Ошибка «" .. tostring(name) .. "»: " .. tostring(err))
+        warn("[AkrivHub] Ошибка «" .. scriptData.name .. "»: " .. tostring(err))
         return false
     end
     return true
@@ -165,6 +160,7 @@ local function createLoadingParticles(parent)
     container.BackgroundTransparency = 1
     container.ZIndex = 2
     container.Parent = parent
+
     for i = 1, 40 do
         local p = Instance.new("ImageLabel")
         p.Size = UDim2.new(0, math.random(4, 12), 0, math.random(4, 12))
@@ -175,10 +171,14 @@ local function createLoadingParticles(parent)
         p.ImageTransparency = math.random(30, 80) / 100
         p.ZIndex = 2
         p.Parent = container
+
         task.spawn(function()
             while p.Parent do
                 TweenService:Create(p, TweenInfo.new(
-                    math.random(15, 35) / 10, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                    math.random(15, 35) / 10,
+                    Enum.EasingStyle.Sine,
+                    Enum.EasingDirection.InOut
+                ), {
                     Position = UDim2.new(math.random(), 0, math.random(), 0),
                     ImageTransparency = math.random(40, 90) / 100,
                     Rotation = math.random(-180, 180)
@@ -199,6 +199,7 @@ local function showLoading()
     sg.IgnoreGuiInset = true
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = LP:WaitForChild("PlayerGui")
+    state.loadingGui = sg
 
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
@@ -228,7 +229,7 @@ local function showLoading()
     sub.Size = UDim2.new(1, 0, 0, 24)
     sub.Position = UDim2.new(0, 0, 0, 78)
     sub.BackgroundTransparency = 1
-    sub.Text = "v1.0 Beta | Rounded UI"
+    sub.Text = "v1.1 Beta | Dynamic Loader"
     sub.TextColor3 = Color3.fromRGB(120, 120, 160)
     sub.Font = Enum.Font.Gotham
     sub.TextSize = 14
@@ -259,9 +260,15 @@ local function showLoading()
 
     createLoadingParticles(sg)
 
-    TweenService:Create(bar, TweenInfo.new(2.5, Enum.EasingStyle.Quart), {
-        Size = UDim2.new(1, 0, 1, 0)
-    }):Play()
+    -- Прогресс-бар обновляется в фоне
+    task.spawn(function()
+        while sg and sg.Parent do
+            TweenService:Create(bar, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {
+                Size = UDim2.new(state.loadProgress, 0, 1, 0)
+            }):Play()
+            task.wait(0.3)
+        end
+    end)
 
     task.delay(3, function()
         if sg and sg.Parent then
@@ -269,6 +276,7 @@ local function showLoading()
             fadeOut:Play()
             fadeOut.Completed:Connect(function()
                 sg:Destroy()
+                state.loadingGui = nil
                 if showMainGui then showMainGui() end
             end)
         end
@@ -285,11 +293,12 @@ function showMainGui()
     sg.IgnoreGuiInset = true
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.Parent = LP:WaitForChild("PlayerGui")
+    state.mainGui = sg
 
     -- Главное окно
     local win = Instance.new("Frame")
-    win.Size = UDim2.new(0, 640, 0, 500)
-    win.Position = UDim2.new(0.5, -320, 0.5, -250)
+    win.Size = UDim2.new(0, 640, 0, 520)
+    win.Position = UDim2.new(0.5, -320, 0.5, -260)
     win.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
     win.BorderSizePixel = 0
     win.Active = true
@@ -309,11 +318,11 @@ function showMainGui()
     win.Size = UDim2.new(0, 0, 0, 0)
     win.Position = UDim2.new(0.5, 0, 0.5, 0)
     TweenService:Create(win, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 640, 0, 500),
-        Position = UDim2.new(0.5, -320, 0.5, -250)
+        Size = UDim2.new(0, 640, 0, 520),
+        Position = UDim2.new(0.5, -320, 0.5, -260)
     }):Play()
 
-    -- ===== ЗАГОЛОВОК =====
+    -- Заголовок
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, 0, 0, 44)
     header.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
@@ -328,7 +337,7 @@ function showMainGui()
     title.Size = UDim2.new(1, -160, 1, 0)
     title.Position = UDim2.new(0, 18, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "AkrivHub | v1.0 Beta"
+    title.Text = "AkrivHub | v1.1 Beta"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 16
@@ -339,7 +348,7 @@ function showMainGui()
     subtitle.Size = UDim2.new(0, 220, 1, 0)
     subtitle.Position = UDim2.new(0, 160, 0, 0)
     subtitle.BackgroundTransparency = 1
-    subtitle.Text = "| 20+ scripts"
+    subtitle.Text = "| Loading..."
     subtitle.TextColor3 = Color3.fromRGB(100, 100, 140)
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 11
@@ -388,7 +397,7 @@ function showMainGui()
         sg:Destroy()
     end)
 
-    -- ===== ПОИСК =====
+    -- Поиск
     local searchFrame = Instance.new("Frame")
     searchFrame.Size = UDim2.new(1, -30, 0, 40)
     searchFrame.Position = UDim2.new(0, 15, 0, 56)
@@ -414,9 +423,9 @@ function showMainGui()
     searchBox.ClearTextOnFocus = false
     searchBox.Parent = searchFrame
 
-    -- ===== СПИСОК СКРИПТОВ =====
+    -- Список скриптов
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -30, 1, -140)
+    scroll.Size = UDim2.new(1, -30, 1, -160)
     scroll.Position = UDim2.new(0, 15, 0, 106)
     scroll.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
     scroll.BorderSizePixel = 0
@@ -435,7 +444,7 @@ function showMainGui()
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Parent = scroll
 
-    -- ===== ФУТЕР =====
+    -- Футер
     local footer = Instance.new("TextLabel")
     footer.Size = UDim2.new(1, -30, 0, 22)
     footer.Position = UDim2.new(0, 15, 1, -28)
@@ -446,10 +455,12 @@ function showMainGui()
     footer.TextSize = 10
     footer.Parent = win
 
-    -- ===== ЛОГИКА ОТОБРАЖЕНИЯ =====
+    -- Логика отображения
     local function clearList()
         for _, c in ipairs(scroll:GetChildren()) do
-            if c:IsA("Frame") or c:IsA("TextLabel") then c:Destroy() end
+            if c:IsA("Frame") or c:IsA("TextLabel") then
+                c:Destroy()
+            end
         end
     end
 
@@ -469,7 +480,6 @@ function showMainGui()
         end
 
         for i, script in ipairs(list) do
-            -- Карточка
             local card = Instance.new("Frame")
             card.Size = UDim2.new(1, 0, 0, 68)
             card.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
@@ -481,7 +491,6 @@ function showMainGui()
             cardCorner.CornerRadius = UDim.new(0, 10)
             cardCorner.Parent = card
 
-            -- Название скрипта
             local nameL = Instance.new("TextLabel")
             nameL.Size = UDim2.new(1, -110, 0, 20)
             nameL.Position = UDim2.new(0, 14, 0, 8)
@@ -494,7 +503,6 @@ function showMainGui()
             nameL.TextTruncate = Enum.TextTruncate.AtEnd
             nameL.Parent = card
 
-            -- Игра
             local gameL = Instance.new("TextLabel")
             gameL.Size = UDim2.new(1, -110, 0, 14)
             gameL.Position = UDim2.new(0, 14, 0, 30)
@@ -507,7 +515,6 @@ function showMainGui()
             gameL.TextTruncate = Enum.TextTruncate.AtEnd
             gameL.Parent = card
 
-            -- Кнопка запуска
             local runBtn = Instance.new("TextButton")
             runBtn.Size = UDim2.new(0, 90, 0, 30)
             runBtn.Position = UDim2.new(1, -102, 0.5, -15)
@@ -527,7 +534,7 @@ function showMainGui()
                 runBtn.Text = "..."
                 runBtn.BackgroundColor3 = Color3.fromRGB(180, 150, 60)
                 task.spawn(function()
-                    local ok = runLoadstring(script.url, script.name)
+                    local ok = runScript(script)
                     task.wait(0.3)
                     runBtn.Text = ok and "✓ ОК" or "✕ Ошибка"
                     runBtn.BackgroundColor3 = ok and Color3.fromRGB(55, 140, 70) or Color3.fromRGB(180, 60, 60)
@@ -539,15 +546,15 @@ function showMainGui()
         end
     end
 
-    -- ===== ФИЛЬТРАЦИЯ =====
+    -- Фильтрация
     local function applyFilter(query)
         if query == "" then
-            renderCards(SCRIPTS)
+            renderCards(state.scripts)
             return
         end
         local q = query:lower()
         local filtered = {}
-        for _, s in ipairs(SCRIPTS) do
+        for _, s in ipairs(state.scripts) do
             if s.name:lower():find(q, 1, true) or s.game:lower():find(q, 1, true) then
                 table.insert(filtered, s)
             end
@@ -559,19 +566,24 @@ function showMainGui()
         applyFilter(searchBox.Text)
     end)
 
-    -- Первичный рендер
-    renderCards(SCRIPTS)
+    -- Первичный рендер (когда загрузка завершена)
+    task.spawn(function()
+        while not state.isLoaded do task.wait(0.2) end
+        subtitle.Text = "| " .. tostring(#state.scripts) .. " scripts"
+        renderCards(state.scripts)
+    end)
 
-    -- ===== СВОРАЧИВАНИЕ =====
+    -- Сворачивание
     local isCollapsed = false
-    local fullSize = UDim2.new(0, 640, 0, 500)
-    local fullPos = UDim2.new(0.5, -320, 0.5, -250)
+    local fullSize = UDim2.new(0, 640, 0, 520)
+    local fullPos = UDim2.new(0.5, -320, 0.5, -260)
 
     local function setCollapsed(col)
         isCollapsed = col
         if col then
             TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 180, 0, 50), Position = UDim2.new(0, 20, 0, 20)
+                Size = UDim2.new(0, 180, 0, 50),
+                Position = UDim2.new(0, 20, 0, 20)
             }):Play()
             collapseBtn.Text = "+"
             searchFrame.Visible = false
@@ -580,17 +592,19 @@ function showMainGui()
             subtitle.Text = "• свёрнуто"
         else
             TweenService:Create(win, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Size = fullSize, Position = fullPos
+                Size = fullSize,
+                Position = fullPos
             }):Play()
             collapseBtn.Text = "−"
             searchFrame.Visible = true
             scroll.Visible = true
             footer.Visible = true
-            subtitle.Text = "| " .. tostring(#SCRIPTS) .. " scripts"
+            subtitle.Text = "| " .. tostring(#state.scripts) .. " scripts"
         end
     end
 
     collapseBtn.MouseButton1Click:Connect(function() setCollapsed(not isCollapsed) end)
+
     UIS.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
@@ -603,6 +617,13 @@ end
 --  СТАРТ
 -- =====================================================
 task.wait(0.5)
+
+-- Показываем экран загрузки
 showLoading()
 
-print("[AkrivHub v1.0 Beta] Загружен. RightShift — свернуть/развернуть.")
+-- Загружаем скрипты в фоне
+task.spawn(function()
+    loadScripts()
+end)
+
+print("[AkrivHub v1.1 Beta] Загружен. Скрипты подтягиваются из GitHub.")
